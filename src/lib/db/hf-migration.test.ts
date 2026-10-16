@@ -3,7 +3,25 @@ import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
-test("fresh database migrates and stores all three HF types with identical owner/name", () => {
+const CHILD_FLAG = "HF_MIGRATION_TEST_ISOLATED";
+const isChild = process.env[CHILD_FLAG] === "1";
+
+if (!isChild) {
+  test("HF migration suite runs with a real SQLite connection", () => {
+    const result = Bun.spawnSync({
+      cmd: [process.execPath, "test", import.meta.path],
+      env: { ...process.env, [CHILD_FLAG]: "1" },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (result.exitCode !== 0) {
+      console.error(result.stdout.toString());
+      console.error(result.stderr.toString());
+    }
+    expect(result.exitCode).toBe(0);
+  }, 60_000);
+} else {
+  test("fresh database migrates and stores all three HF types with identical owner/name", () => {
   const sqlite = new Database(":memory:");
   try {
     for (const migration of readMigrationFiles({ migrationsFolder: "./drizzle" })) {
@@ -21,5 +39,6 @@ test("fresh database migrates and stores all three HF types with identical owner
     }
     expect((sqlite.query("SELECT count(*) AS n FROM repositories").get() as { n: number }).n).toBe(3);
     expect(() => sqlite.run("INSERT INTO repositories SELECT * FROM repositories WHERE id='model'")).toThrow();
-  } finally { sqlite.close(); }
-});
+    } finally { sqlite.close(); }
+  });
+}
