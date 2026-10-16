@@ -120,7 +120,7 @@ export function NotificationSettings({
                 size="sm"
                 onClick={handleTestNotification}
                 disabled={isTesting}
-                className="bg-indigo-500 text-white hover:bg-indigo-600"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {isTesting ? (
                   <>
@@ -187,7 +187,7 @@ export function NotificationSettings({
                 >
                   <Input
                     id="ntfy-topic"
-                    placeholder="gitea-mirror"
+                    placeholder="hf-mirror"
                     value={notificationConfig.ntfy?.topic || ""}
                     onChange={(e) =>
                       onNotificationChange({
@@ -293,7 +293,7 @@ export function NotificationSettings({
                 >
                   <Input
                     id="apprise-token"
-                    placeholder="gitea-mirror"
+                    placeholder="hf-mirror"
                     value={notificationConfig.apprise?.token || ""}
                     onChange={(e) =>
                       onNotificationChange({
@@ -420,7 +420,7 @@ export function NotificationSettings({
                   <Input
                     id="webhook-url"
                     type="url"
-                    placeholder="https://example.com/hooks/gitea-mirror"
+                    placeholder="https://example.com/hooks/hf-mirror"
                     value={notificationConfig.webhook?.url || ""}
                     onChange={(e) =>
                       onNotificationChange({

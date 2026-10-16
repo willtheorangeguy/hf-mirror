@@ -6,7 +6,7 @@ import type { Repository } from "@/lib/db/schema";
 import type { Config } from "@/types/config";
 import { requireAuthenticatedUserId } from "@/lib/auth-guards";
 import { jsonResponse, createSecureErrorResponse } from "@/lib/utils";
-import { getGiteaRepoOwnerAsync } from "@/lib/gitea";
+import { getGiteaRepoOwnerAsync } from "@/lib/destination-api";
 import { moveMirror } from "@/lib/destination-transfer-service";
 import { MoveMirrorError, OWNER_NAME_PATTERN } from "@/lib/destination-transfer";
 

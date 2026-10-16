@@ -1,12 +1,11 @@
+import { reconcileHF } from "@/lib/hf-reconcile";
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, configs } from "@/lib/db";
-import type { Config } from "@/types/config";
+
 import { requireAuthenticatedUserId } from "@/lib/auth-guards";
 import { jsonResponse, createSecureErrorResponse } from "@/lib/utils";
-import { reconcileDestination } from "@/lib/destination-reconcile-service";
-import { usesPushEngine } from "@/lib/destination-connection";
 
 const bodySchema = z.object({
   dryRun: z.boolean().optional().default(true),
@@ -74,18 +73,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    if (usesPushEngine(config)) {
-      return jsonResponse({
-        data: {
-          success: false,
-          error:
-            "Reconcile compares a Gitea or Forgejo destination with the database. GitHub and GitLab destinations are pushed by this app and have nothing to reconcile.",
-        },
-        status: 400,
-      });
-    }
-
-    const result = await reconcileDestination(config as unknown as Config, parsed.data);
+    const result = await reconcileHF(config, parsed.data);
 
     return jsonResponse({
       data: { success: true, ...result },

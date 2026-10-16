@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import { createHmac } from "node:crypto";
 import { sendWebhookNotification } from "./webhook";
 import type { NotificationEvent } from "./ntfy";
@@ -6,8 +6,12 @@ import type { WebhookConfig } from "@/types/config";
 
 describe("sendWebhookNotification", () => {
   let mockFetch: ReturnType<typeof mock>;
+  let originalFetch: typeof fetch;
+
+  afterEach(() => { globalThis.fetch = originalFetch; });
 
   beforeEach(() => {
+    originalFetch = globalThis.fetch;
     mockFetch = mock(() =>
       Promise.resolve(new Response("ok", { status: 200 }))
     );
@@ -15,7 +19,7 @@ describe("sendWebhookNotification", () => {
   });
 
   const baseConfig: WebhookConfig = {
-    url: "https://example.com/hooks/gitea-mirror",
+    url: "https://example.com/hooks/hf-mirror",
   };
 
   const baseEvent: NotificationEvent = {
@@ -29,7 +33,7 @@ describe("sendWebhookNotification", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toBe("https://example.com/hooks/gitea-mirror");
+    expect(url).toBe("https://example.com/hooks/hf-mirror");
     expect(opts.method).toBe("POST");
     expect(opts.headers["Content-Type"]).toBe("application/json");
   });
@@ -69,7 +73,7 @@ describe("sendWebhookNotification", () => {
     );
     globalThis.fetch = mockFetch as any;
 
-    expect(
+    await expect(
       sendWebhookNotification(baseConfig, baseEvent)
     ).rejects.toThrow("Webhook error: 401");
   });

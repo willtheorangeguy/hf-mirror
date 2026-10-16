@@ -31,7 +31,7 @@ export const ORGANIZATION_EXPORT_COLUMNS = Object.keys(
 ) as (keyof typeof organizationExportSelection)[];
 
 export function organizationExportFilename(now: Date): string {
-  return `gitea-mirror-organizations-${now.toISOString().slice(0, 10)}.csv`;
+  return `hf-mirror-organizations-${now.toISOString().slice(0, 10)}.csv`;
 }
 
 export const GET: APIRoute = async ({ request, locals }) => {

@@ -9,7 +9,7 @@
 export type OrganizationsViewMode = "cards" | "list";
 
 export const ORGANIZATIONS_VIEW_STORAGE_KEY = "organizationsView";
-export const ORGANIZATIONS_VIEW_CHANGE_EVENT = "gitea-mirror:organizations-view-change";
+export const ORGANIZATIONS_VIEW_CHANGE_EVENT = "hf-mirror:organizations-view-change";
 
 export const DEFAULT_ORGANIZATIONS_VIEW: OrganizationsViewMode = "cards";
 

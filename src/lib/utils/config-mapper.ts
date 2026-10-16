@@ -2,26 +2,20 @@
  * Maps between UI config structure and database schema structure
  */
 
-import type { 
-  GitHubConfig, 
-  GiteaConfig,
-  MirrorOptions, 
-  AdvancedOptions,
-  SaveConfigApiRequest 
-} from "@/types/config";
+import type { HFSourceConfig, GiteaConfig, MirrorOptions, AdvancedOptions } from "@/types/config";
 import {
   normalizeSourceProviderKind,
   normalizeSourceUrl,
 } from "@/lib/source-providers/kinds";
 import { normalizeDestinationProviderKind } from "@/lib/destination-kinds";
 import { z } from "zod";
-import { githubConfigSchema, giteaConfigSchema, scheduleConfigSchema, cleanupConfigSchema } from "@/lib/db/schema";
+import { sourceConfigSchema, giteaConfigSchema, scheduleConfigSchema, cleanupConfigSchema } from "@/lib/db/schema";
 import { parseInterval } from "@/lib/utils/duration-parser";
 import { normalizeReleaseAssetLimit } from "@/lib/utils/mirror-overrides";
 import { buildClockCronExpression, normalizeTimezone, parseClockCronExpression } from "@/lib/utils/schedule-utils";
 
 // Use the actual database schema types
-type DbGitHubConfig = z.infer<typeof githubConfigSchema>;
+type DbSourceConfig = z.infer<typeof sourceConfigSchema>;
 type DbGiteaConfig = z.infer<typeof giteaConfigSchema>;
 type DbScheduleConfig = z.infer<typeof scheduleConfigSchema>;
 type DbCleanupConfig = z.infer<typeof cleanupConfigSchema>;
@@ -61,60 +55,61 @@ function normalizeOrgList(orgs: string[] | undefined): string[] {
  * `existing` is the stored DB config (if any). Fields the Configuration form
  * doesn't expose (mirrorInterval, topics, templates, ...) are preserved from it
  * so a UI save can't silently reset values configured via environment variables
- * (e.g. GITEA_MIRROR_INTERVAL, see issue #338).
+ * (e.g. SCHEDULE_INTERVAL, see issue #338).
  */
 export function mapUiToDbConfig(
-  githubConfig: GitHubConfig,
+  sourceConfig: HFSourceConfig,
   giteaConfig: GiteaConfig,
   mirrorOptions: MirrorOptions,
   advancedOptions: AdvancedOptions,
   existing?: {
-    githubConfig?: Partial<DbGitHubConfig>;
+    sourceConfig?: Partial<DbSourceConfig>;
     giteaConfig?: Partial<DbGiteaConfig>;
   }
-): { githubConfig: DbGitHubConfig; giteaConfig: DbGiteaConfig } {
-  // The source host. GitHub keeps no per-config URL: GHES routing comes
+): { sourceConfig: DbSourceConfig; giteaConfig: DbGiteaConfig } {
+
   // from GH_API_URL. Other hosts store their normalized instance URL.
   const sourceProvider = normalizeSourceProviderKind(
-    githubConfig.provider ?? existing?.githubConfig?.provider
+    sourceConfig.provider ?? existing?.sourceConfig?.provider
   );
-  const rawSourceUrl = githubConfig.url ?? existing?.githubConfig?.url ?? "";
+  const rawSourceUrl = sourceConfig.url ?? existing?.sourceConfig?.url ?? "";
   const sourceUrl =
-    sourceProvider === "github" || !rawSourceUrl.trim()
+    false || !rawSourceUrl.trim()
       ? undefined
       : normalizeSourceUrl(rawSourceUrl, sourceProvider);
 
-  // Map GitHub config to match database schema fields
-  const dbGithubConfig: DbGitHubConfig = {
+  const dbSourceConfig: DbSourceConfig = {
     // Map username to owner field
-    owner: githubConfig.username,
+    owner: sourceConfig.username,
     provider: sourceProvider,
+    repoTypes: [...new Set<"model" | "dataset" | "space">(sourceConfig.repoTypes ?? existing?.sourceConfig?.repoTypes ?? ["model", "dataset", "space"])],
+    collections: [...new Set(sourceConfig.collections ?? existing?.sourceConfig?.collections ?? [])],
     url: sourceUrl,
-    type: existing?.githubConfig?.type || "personal", // Not in UI; preserve stored value
-    token: githubConfig.token || "",
+    type: existing?.sourceConfig?.type || "personal", // Not in UI; preserve stored value
+    token: sourceConfig.token || "",
 
     // Map checkbox fields with proper names
-    includeStarred: githubConfig.mirrorStarred,
-    includePrivate: githubConfig.privateRepositories,
-    includeCollaboratorRepos: githubConfig.includeCollaboratorRepos ?? true,
+    includeStarred: sourceConfig.mirrorStarred,
+    includePrivate: sourceConfig.privateRepositories,
+    includeCollaboratorRepos: sourceConfig.includeCollaboratorRepos ?? true,
     includeForks: !advancedOptions.skipForks, // Note: UI has skipForks, DB has includeForks
     skipForks: advancedOptions.skipForks, // Add skipForks field
-    includeArchived: existing?.githubConfig?.includeArchived ?? false, // Not in UI; preserve stored value
-    includePublic: existing?.githubConfig?.includePublic ?? true, // Not in UI; preserve stored value
-    
+    includeArchived: existing?.sourceConfig?.includeArchived ?? false, // Not in UI; preserve stored value
+    includePublic: existing?.sourceConfig?.includePublic ?? true, // Not in UI; preserve stored value
+
     // Organization related fields — opt-in allowlist (empty = all org repos)
-    includeOrganizations: normalizeOrgList(githubConfig.includeOrganizations),
-    
+    includeOrganizations: normalizeOrgList(sourceConfig.includeOrganizations),
+
     // Starred repos organization
     starredReposOrg: giteaConfig.starredReposOrg,
     starredReposMode: giteaConfig.starredReposMode || "dedicated-org",
-    starredLists: normalizeStarredLists(githubConfig.starredLists),
-    starredDuplicateStrategy: githubConfig.starredDuplicateStrategy ?? "suffix",
-    
+    starredLists: normalizeStarredLists(sourceConfig.starredLists),
+    starredDuplicateStrategy: sourceConfig.starredDuplicateStrategy ?? "suffix",
+
     // Mirror strategy
     mirrorStrategy: giteaConfig.mirrorStrategy || "preserve",
     defaultOrg: giteaConfig.organization,
-    
+
     // Advanced options
     starredCodeOnly: advancedOptions.starredCodeOnly,
     autoMirrorStarred: advancedOptions.autoMirrorStarred ?? false,
@@ -132,9 +127,9 @@ export function mapUiToDbConfig(
     defaultOwner: giteaConfig.username, // Map username to defaultOwner
     organization: giteaConfig.organization, // Add organization field
     preserveOrgStructure: giteaConfig.mirrorStrategy === "preserve" || giteaConfig.mirrorStrategy === "mixed", // Add preserveOrgStructure field
-    
+
     // Mirror interval — not in UI; preserve the stored value so a save doesn't
-    // reset an env-configured GITEA_MIRROR_INTERVAL back to the default (#338)
+    // reset an env-configured SCHEDULE_INTERVAL back to the default (#338)
     mirrorInterval: existing?.giteaConfig?.mirrorInterval || "8h",
     lfs: mirrorOptions.mirrorLFS || false, // LFS mirroring option
     wiki: mirrorOptions.mirrorMetadata && mirrorOptions.metadataComponents.wiki,
@@ -162,7 +157,7 @@ export function mapUiToDbConfig(
       : existing?.giteaConfig?.forkStrategy && existing.giteaConfig.forkStrategy !== "skip"
         ? existing.giteaConfig.forkStrategy
         : "reference",
-    
+
     // Mirror options from UI
     issueConcurrency: giteaConfig.issueConcurrency ?? 3,
     pullRequestConcurrency: giteaConfig.pullRequestConcurrency ?? 5,
@@ -185,7 +180,7 @@ export function mapUiToDbConfig(
   };
 
   return {
-    githubConfig: dbGithubConfig,
+    sourceConfig: dbSourceConfig,
     giteaConfig: dbGiteaConfig,
   };
 }
@@ -194,23 +189,25 @@ export function mapUiToDbConfig(
  * Maps database schema structure to UI config structure
  */
 export function mapDbToUiConfig(dbConfig: any): {
-  githubConfig: GitHubConfig;
+  sourceConfig: HFSourceConfig;
   giteaConfig: GiteaConfig;
   mirrorOptions: MirrorOptions;
   advancedOptions: AdvancedOptions;
 } {
-  // Map from database GitHub config to UI fields
-  const githubConfig: GitHubConfig = {
-    provider: normalizeSourceProviderKind(dbConfig.githubConfig?.provider),
-    url: dbConfig.githubConfig?.url || "",
-    username: dbConfig.githubConfig?.owner || "", // Map owner to username
-    token: dbConfig.githubConfig?.token || "",
-    privateRepositories: dbConfig.githubConfig?.includePrivate || false, // Map includePrivate to privateRepositories
-    includeCollaboratorRepos: dbConfig.githubConfig?.includeCollaboratorRepos ?? true,
-    includeOrganizations: normalizeOrgList(dbConfig.githubConfig?.includeOrganizations),
-    mirrorStarred: dbConfig.githubConfig?.includeStarred || false, // Map includeStarred to mirrorStarred
-    starredLists: normalizeStarredLists(dbConfig.githubConfig?.starredLists),
-    starredDuplicateStrategy: dbConfig.githubConfig?.starredDuplicateStrategy ?? "suffix",
+
+  const sourceConfig: HFSourceConfig = {
+    provider: normalizeSourceProviderKind(dbConfig.sourceConfig?.provider),
+    repoTypes: dbConfig.sourceConfig?.repoTypes ?? ["model", "dataset", "space"],
+    collections: dbConfig.sourceConfig?.collections ?? [],
+    url: dbConfig.sourceConfig?.url || "",
+    username: dbConfig.sourceConfig?.owner || "", // Map owner to username
+    token: dbConfig.sourceConfig?.token || "",
+    privateRepositories: dbConfig.sourceConfig?.includePrivate || false, // Map includePrivate to privateRepositories
+    includeCollaboratorRepos: dbConfig.sourceConfig?.includeCollaboratorRepos ?? true,
+    includeOrganizations: normalizeOrgList(dbConfig.sourceConfig?.includeOrganizations),
+    mirrorStarred: dbConfig.sourceConfig?.includeStarred || false, // Map includeStarred to mirrorStarred
+    starredLists: normalizeStarredLists(dbConfig.sourceConfig?.starredLists),
+    starredDuplicateStrategy: dbConfig.sourceConfig?.starredDuplicateStrategy ?? "suffix",
   };
 
   // Map from database Gitea config to UI fields
@@ -220,12 +217,12 @@ export function mapDbToUiConfig(dbConfig: any): {
     externalUrl: dbConfig.giteaConfig?.externalUrl || "",
     username: dbConfig.giteaConfig?.defaultOwner || "", // Map defaultOwner to username
     token: dbConfig.giteaConfig?.token || "",
-    organization: dbConfig.githubConfig?.defaultOrg || "github-mirrors", // Get from GitHub config
+    organization: dbConfig.sourceConfig?.defaultOrg || "hf-mirrors",
     visibility: dbConfig.giteaConfig?.visibility === "default" ? "public" : dbConfig.giteaConfig?.visibility || "public",
-    starredReposOrg: dbConfig.githubConfig?.starredReposOrg || "starred", // Get from GitHub config
-    starredReposMode: dbConfig.githubConfig?.starredReposMode || "dedicated-org", // Get from GitHub config
+    starredReposOrg: dbConfig.sourceConfig?.starredReposOrg || "starred",
+    starredReposMode: dbConfig.sourceConfig?.starredReposMode || "dedicated-org",
     preserveOrgStructure: dbConfig.giteaConfig?.preserveVisibility || false, // Map preserveVisibility
-    mirrorStrategy: dbConfig.githubConfig?.mirrorStrategy || "preserve", // Get from GitHub config
+    mirrorStrategy: dbConfig.sourceConfig?.mirrorStrategy || "preserve",
     personalReposOrg: undefined, // Not stored in current schema
     issueConcurrency: dbConfig.giteaConfig?.issueConcurrency ?? 3,
     pullRequestConcurrency: dbConfig.giteaConfig?.pullRequestConcurrency ?? 5,
@@ -257,15 +254,15 @@ export function mapDbToUiConfig(dbConfig: any): {
 
   // Map advanced options
   const advancedOptions: AdvancedOptions = {
-    skipForks: !(dbConfig.githubConfig?.includeForks ?? true), // Invert includeForks to get skipForks
+    skipForks: !(dbConfig.sourceConfig?.includeForks ?? true), // Invert includeForks to get skipForks
     // Support both old (skipStarredIssues) and new (starredCodeOnly) field names for backward compatibility
-    starredCodeOnly: dbConfig.githubConfig?.starredCodeOnly ?? (dbConfig.githubConfig as any)?.skipStarredIssues ?? false,
-    autoMirrorStarred: dbConfig.githubConfig?.autoMirrorStarred ?? false,
-    skipPersonalRepos: dbConfig.githubConfig?.skipPersonalRepos ?? false,
+    starredCodeOnly: dbConfig.sourceConfig?.starredCodeOnly ?? (dbConfig.sourceConfig as any)?.skipStarredIssues ?? false,
+    autoMirrorStarred: dbConfig.sourceConfig?.autoMirrorStarred ?? false,
+    skipPersonalRepos: dbConfig.sourceConfig?.skipPersonalRepos ?? false,
   };
 
   return {
-    githubConfig,
+    sourceConfig,
     giteaConfig,
     mirrorOptions,
     advancedOptions,
@@ -389,13 +386,6 @@ export function mapUiCleanupToDb(uiCleanup: any): DbCleanupConfig {
   return {
     enabled: Boolean(uiCleanup.enabled),
     retentionDays: retentionSeconds,
-    deleteFromGitea: uiCleanup.deleteFromGitea ?? false,
-    deleteIfNotInGitHub: uiCleanup.deleteIfNotInGitHub ?? true,
-    protectedRepos: uiCleanup.protectedRepos ?? [],
-    dryRun: uiCleanup.dryRun ?? false,
-    orphanedRepoAction: (uiCleanup.orphanedRepoAction as DbCleanupConfig["orphanedRepoAction"]) || "archive",
-    batchSize: uiCleanup.batchSize ?? 10,
-    pauseBetweenDeletes: uiCleanup.pauseBetweenDeletes ?? 2000,
     lastRun: uiCleanup.lastRun ?? null,
     nextRun: uiCleanup.nextRun ?? null,
   };
@@ -409,7 +399,7 @@ export function mapDbCleanupToUi(dbCleanup: DbCleanupConfig): any {
   if (!dbCleanup) {
     return {
       enabled: false,
-      retentionDays: 604800, // Default to 7 days in seconds
+      retentionDays: 604800,
       lastRun: null,
       nextRun: null,
     };
@@ -418,13 +408,6 @@ export function mapDbCleanupToUi(dbCleanup: DbCleanupConfig): any {
   return {
     enabled: dbCleanup.enabled ?? false,
     retentionDays: dbCleanup.retentionDays ?? 604800,
-    deleteFromGitea: dbCleanup.deleteFromGitea ?? false,
-    deleteIfNotInGitHub: dbCleanup.deleteIfNotInGitHub ?? true,
-    protectedRepos: dbCleanup.protectedRepos ?? [],
-    dryRun: dbCleanup.dryRun ?? false,
-    orphanedRepoAction: dbCleanup.orphanedRepoAction ?? "archive",
-    batchSize: dbCleanup.batchSize ?? 10,
-    pauseBetweenDeletes: dbCleanup.pauseBetweenDeletes ?? 2000,
     lastRun: dbCleanup.lastRun ?? null,
     nextRun: dbCleanup.nextRun ?? null,
   };

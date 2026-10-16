@@ -1,22 +1,15 @@
 import type { APIRoute } from "astro";
-import type { Octokit } from "@octokit/rest";
-import type { SourceRecord } from "@/lib/sources";
-import {
-  decryptSourceToken,
-  findSourceForRepository,
-  listSources,
-  resolveGitHubApiBaseUrl,
-} from "@/lib/sources";
+
 import type { MirrorRepoRequest, MirrorRepoResponse } from "@/types/mirror";
 import { db, configs, repositories } from "@/lib/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { repositoryVisibilityEnum, repoStatusEnum } from "@/types/Repository";
-import { getGiteaRepoOwnerAsync } from "@/lib/gitea";
-import { mirrorRepositoryToDestination } from "@/lib/mirror-dispatch";
-import { createGitHubClient, createPublicGitHubClient } from "@/lib/github";
-import { processWithResilience } from "@/lib/utils/concurrency";
+
 import { createSecureErrorResponse } from "@/lib/utils";
 import { requireAuthenticatedUserId } from "@/lib/auth-guards";
+import { repositorySchema } from "@/lib/db/schema";
+import { mirrorRepositoryToDestination } from "@/lib/mirror-dispatch";
+import { processWithResilience } from "@/lib/utils/concurrency";
 
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
@@ -85,108 +78,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // Start async mirroring in background with parallel processing and resilience
     setTimeout(async () => {
-      // Only GitHub sources need an API client while mirroring (metadata).
-      // Other hosts get code-only mirrors through Gitea. The selected
-      // repositories can come from different sources, so the client is
-      // built per repository from its own source, never one for the batch.
-      const sources = await listSources(userId);
-      const octokitForSource = (source: SourceRecord | null): Octokit | null => {
-        if (!source || source.provider !== "github") return null;
-        const token = decryptSourceToken(source.token);
-        // A tokenless GitHub source still gets an anonymous public client
-        // (60 req/hr) so public-repo metadata mirrors; an empty token must
-        // never reach createGitHubClient, which would send `auth: ""`.
-        return token
-          ? createGitHubClient(
-              token,
-              userId,
-              source.username || undefined,
-              resolveGitHubApiBaseUrl(source.url)
-            )
-          : createPublicGitHubClient(resolveGitHubApiBaseUrl(source.url));
-      };
-
-      // Define the concurrency limit - adjust based on API rate limits
-      const CONCURRENCY_LIMIT = 3;
-
-      // Process repositories in parallel with resilience to container restarts
-      await processWithResilience(
-        repos,
-        async (repo) => {
-          // Prepare repository data
-          const repoData = {
-            ...repo,
-            status: repoStatusEnum.parse("imported"),
-            organization: repo.organization ?? undefined,
-            lastMirrored: repo.lastMirrored ?? undefined,
-            errorMessage: repo.errorMessage ?? undefined,
-            forkedFrom: repo.forkedFrom ?? undefined,
-            visibility: repositoryVisibilityEnum.parse(repo.visibility),
-            mirroredLocation: repo.mirroredLocation || "",
-          };
-
-          // Log the start of mirroring
-          console.log(`Starting mirror for repository: ${repo.name}`);
-
-          const repoSource = findSourceForRepository(repo, sources);
-
-          // Determine where the repository should be mirrored (with organization overrides)
-          const owner = await getGiteaRepoOwnerAsync({
-            config,
-            repository: repoData,
-            sourceUsername: repoSource?.username,
-          });
-
-          console.log(`Repository ${repo.name} will be mirrored to owner: ${owner}`);
-
-          // For single-org strategy, or when mirroring to an org,
-          // use the org mirroring function to ensure proper organization handling
-          const mirrorStrategy = config.githubConfig?.mirrorStrategy || 
-            (config.giteaConfig?.preserveOrgStructure ? "preserve" : "flat-user");
-          
-          const shouldUseOrgMirror = 
-            owner !== config.giteaConfig?.defaultOwner || // Different owner means org
-            mirrorStrategy === "single-org"; // Single-org strategy always uses org
-
-          // Gitea and Forgejo receive a pull mirror; GitHub and GitLab are
-          // pushed by the engine. The dispatcher picks the path.
+      try {
+        await processWithResilience(repos, async (repo) => {
           await mirrorRepositoryToDestination({
             config,
-            octokit: octokitForSource(repoSource),
-            repository: repoData,
-            orgName: shouldUseOrgMirror ? owner : undefined,
+            repository: repositorySchema.parse({ ...repo, mirroredLocation: repo.mirroredLocation ?? "" }),
           });
-
           return repo;
-        },
-        {
-          userId: config.userId || "",
+        }, {
+          userId,
           jobType: "mirror",
           getItemId: (repo) => repo.id,
           getItemName: (repo) => repo.name,
-          concurrencyLimit: CONCURRENCY_LIMIT,
+          concurrencyLimit: 3,
           maxRetries: 2,
           retryDelay: 2000,
-          checkpointInterval: 5, // Checkpoint every 5 repositories to reduce event frequency
-          onProgress: (completed, total, result) => {
-            const percentComplete = Math.round((completed / total) * 100);
-            console.log(
-              `Mirroring progress: ${percentComplete}% (${completed}/${total})`
-            );
-
-            if (result) {
-              console.log(`Successfully mirrored repository: ${result.name}`);
-            }
-          },
-          onRetry: (repo, error, attempt) => {
-            console.log(
-              `Retrying repository ${repo.name} (attempt ${attempt}): ${error.message}`
-            );
-          },
-        }
-      );
-
-      console.log("All repository mirroring tasks completed");
+          checkpointInterval: 5,
+        });
+      } catch (error) {
+        console.error("Repository mirror batch failed", error);
+      }
     }, 0);
 
     const responsePayload: MirrorRepoResponse = {

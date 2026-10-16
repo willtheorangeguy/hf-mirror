@@ -14,7 +14,7 @@ import {
 } from "@/lib/repo-utils";
 import { loadOrganizationForkPolicies } from "@/lib/utils/mirror-overrides";
 import { requireAuthenticatedUserId } from "@/lib/auth-guards";
-import { isMirrorableGitHubRepo } from "@/lib/repo-eligibility";
+import { isMirrorableSourceRepository } from "@/lib/repo-eligibility";
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const authResult = await requireAuthenticatedUserId({ request, locals });
@@ -99,7 +99,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         // Fetch source data in parallel
         const [basicAndForkedRepos, starredRepos, orgResult] = await Promise.all([
           sourceProvider.listRepositories(config, { orgForkOverrides }),
-          config.githubConfig?.includeStarred
+          config.sourceConfig?.includeStarred
             ? sourceProvider.listStarredRepositories(config)
             : Promise.resolve([]),
           sourceProvider.listOrganizations(config, ignoredOrgNames),
@@ -107,13 +107,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
         const { organizations: gitOrgs, failedOrgs } = orgResult;
 
         // Merge and de-duplicate by fullName, preferring starred variant when duplicated
-        const allGithubRepos = mergeGitReposPreferStarred(basicAndForkedRepos, starredRepos);
-        const mirrorableGithubRepos = allGithubRepos.filter(isMirrorableGitHubRepo);
-        totalSkippedDisabled += allGithubRepos.length - mirrorableGithubRepos.length;
+        const allSourceRepos = mergeGitReposPreferStarred(basicAndForkedRepos, starredRepos);
+        const mirrorableSourceRepos = allSourceRepos.filter(isMirrorableSourceRepository);
+        totalSkippedDisabled += allSourceRepos.length - mirrorableSourceRepos.length;
 
         // Prepare full list of repos and orgs. The normalizer stamps the source
         // provider and URL on every row; sourceId ties the row to this source.
-        const newRepos = mirrorableGithubRepos.map((repo) =>
+        const newRepos = mirrorableSourceRepos.map((repo) =>
           normalizeGitRepoToInsert(repo, { userId, configId: config.id, sourceId: source.id })
         );
 

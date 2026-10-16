@@ -46,11 +46,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const config = configResult[0];
 
-    if (!config || !config.githubConfig.token || !config.giteaConfig?.token) {
+    if (!config || !config.sourceConfig.token || !config.giteaConfig?.token) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Missing GitHub or Gitea configuration.",
+          error: "Missing HF source or Gitea destination configuration.",
         }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );

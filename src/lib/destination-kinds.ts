@@ -1,19 +1,10 @@
-/**
- * The hosts Gitea Mirror can mirror into.
- *
- * Gitea and Forgejo share the same API and are pull mirrors: the destination
- * fetches from the source itself. GitHub and GitLab have no usable pull
- * mirror API, so they are push targets: this app keeps a bare clone and
- * pushes it with `git push --mirror` (see src/lib/push-engine).
- *
- * Kept free of imports so client components can use it.
- */
-export const DESTINATION_PROVIDER_KINDS = ["gitea", "forgejo", "github", "gitlab"] as const;
+
+export const DESTINATION_PROVIDER_KINDS = ["gitea", "forgejo"] as const;
 
 export type DestinationProviderKind = (typeof DESTINATION_PROVIDER_KINDS)[number];
 
 /** Destinations that receive mirrors through the push engine. */
-export const PUSH_DESTINATION_KINDS = ["github", "gitlab"] as const;
+export const PUSH_DESTINATION_KINDS = ["gitea", "forgejo"] as const;
 
 export type PushDestinationKind = (typeof PUSH_DESTINATION_KINDS)[number];
 
@@ -27,28 +18,22 @@ export function isBetaDestinationProvider(kind: DestinationProviderKind): boolea
 export const DESTINATION_PROVIDER_LABELS: Record<DestinationProviderKind, string> = {
   gitea: "Gitea",
   forgejo: "Forgejo",
-  github: "GitHub",
-  gitlab: "GitLab",
 };
 
 /** Base URL used when the config has no URL for a hosted destination. */
 export const DESTINATION_PROVIDER_DEFAULT_URLS: Partial<Record<DestinationProviderKind, string>> = {
-  github: "https://github.com",
-  gitlab: "https://gitlab.com",
 };
 
 /** What the host calls a group of repositories owned by a team. */
 export const DESTINATION_PROVIDER_ORG_NOUNS: Record<DestinationProviderKind, string> = {
   gitea: "organization",
   forgejo: "organization",
-  github: "organization",
-  gitlab: "group",
 };
 
 /** Token scopes a push target needs, for the settings hint. */
 export const PUSH_DESTINATION_TOKEN_SCOPES: Record<PushDestinationKind, string[]> = {
-  github: ["repo", "workflow", "delete_repo (only for cleanup deletes)"],
-  gitlab: ["api", "write_repository"],
+  gitea: ["write:repository", "write:organization"],
+  forgejo: ["write:repository", "write:organization"],
 };
 
 export function isDestinationProviderKind(value: unknown): value is DestinationProviderKind {

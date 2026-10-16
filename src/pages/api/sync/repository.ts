@@ -1,8 +1,9 @@
+import { normalizedRepositoryName } from "@/lib/repo-utils";
 import type { APIRoute } from "astro";
 import { configs, db, repositories } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { and, eq, sql } from "drizzle-orm";
-import { type Repository } from "@/lib/db/schema";
+import { repositorySchema, type Repository } from "@/lib/db/schema";
 import { jsonResponse, createSecureErrorResponse } from "@/lib/utils";
 import type {
   AddRepositoriesApiRequest,
@@ -70,12 +71,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // connected source whose host matches it; otherwise the primary source.
     // The URL shape cannot tell providers apart, so multiple sources on the
     // same host resolve to the primary one.
-    const { listSources } = await import("@/lib/sources");
+    const { listSources, ensureSourcesFromConfig } = await import("@/lib/sources");
     const { createSourceProviderFromSource } = await import("@/lib/source-providers");
-    const userSources = await listSources(userId);
+    await ensureSourcesFromConfig(userId);
+    const userSources = (await listSources(userId)).filter(source => source.enabled);
 
     const pastedHost = host?.trim().toLowerCase() || "";
-    let source = userSources[0];
+    let source = body.sourceId ? userSources.find(candidate => candidate.id === body.sourceId) : userSources[0];
+    if (body.sourceId && !source) return jsonResponse({ data: { success: false, error: "Source not found or disabled" }, status: 400 });
     if (pastedHost) {
       const hostMatches = userSources.filter((s) => sourceHostOf(s.url) === pastedHost);
       if (hostMatches.length === 0) {
@@ -87,7 +90,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
           status: 400,
         });
       }
-      source = hostMatches.includes(userSources[0]) ? userSources[0] : hostMatches[0];
+      if (body.sourceId && !hostMatches.some(candidate => candidate.id === body.sourceId)) return jsonResponse({ data: { success: false, error: "Repository URL does not match the selected source" }, status: 400 });
+      source = body.sourceId ? hostMatches.find(candidate => candidate.id === body.sourceId) : hostMatches.includes(userSources[0]) ? userSources[0] : hostMatches[0];
     }
 
     if (!source) {
@@ -105,13 +109,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const sourceLabel = SOURCE_PROVIDER_LABELS[sourceProvider.kind];
 
     // Prefer the pasted path segments: the source host knows how to split
-    // them (GitLab nests groups, GitHub and Gitea do not).
+
+    if (Array.isArray(path) && path.length && !sourceProvider.resolveRepositoryPath(path)) return jsonResponse({ data: { success: false, error: "Invalid HF repository URL" }, status: 400 });
     const resolvedPath =
       (Array.isArray(path) && path.length > 0
         ? sourceProvider.resolveRepositoryPath(path)
         : null) ?? { owner: trimmedOwner, repo: trimmedRepo };
 
-    const normalizedFullName = `${resolvedPath.owner}/${resolvedPath.repo}`.toLowerCase();
+    const repoType = resolvedPath.repoType ?? body.repoType ?? "model";
+    if (!["model", "dataset", "space"].includes(repoType)) return jsonResponse({ data: { success: false, error: "Invalid HF repository type" }, status: 400 });
+    const normalizedFullName = normalizedRepositoryName(`${resolvedPath.owner}/${resolvedPath.repo}`, repoType, source.provider);
 
     // A repository is unique per source: the same full name under another
     // source is a different repository and may coexist.
@@ -138,7 +145,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    const repoData = await sourceProvider.getRepository(resolvedPath.owner, resolvedPath.repo);
+    const repoData = await sourceProvider.getRepository(resolvedPath.owner, resolvedPath.repo, repoType);
     if (!repoData) {
       return jsonResponse({
         data: {
@@ -155,7 +162,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       sourceId: source.id,
       name: repoData.name,
       fullName: repoData.fullName,
-      normalizedFullName: repoData.fullName.toLowerCase(),
+      normalizedFullName,
+      repoType: repoData.repoType ?? "model",
+      isGated: repoData.isGated ?? false,
       url: repoData.url,
       cloneUrl: repoData.cloneUrl,
       owner: repoData.owner,
@@ -193,36 +202,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
       const resPayload: AddRepositoriesApiResponse = {
         success: true,
-        repository: updatedRepo ?? existingRepo,
+        repository: repositorySchema.parse({ ...(updatedRepo ?? existingRepo), mirroredLocation: (updatedRepo ?? existingRepo).mirroredLocation ?? "" }),
         message: "Repository already exists; metadata refreshed.",
       };
 
       return jsonResponse({ data: resPayload, status: 200 });
     }
 
-    const metadata = {
+    const metadata = repositorySchema.parse({
       id: uuidv4(),
       status: "imported" as Repository["status"],
-      lastMirrored: null,
-      errorMessage: null,
-      mirroredLocation: "",
-      destinationOrg: null,
       importedAt: new Date(),
       createdAt: repoData.createdAt,
       ...baseMetadata,
-    } satisfies Repository;
+    });
 
     await db
       .insert(repositories)
-      .values(metadata)
+      .values({ ...metadata, sourceProvider: source.provider, destinationProvider: config.giteaConfig.provider ?? "gitea" })
       .onConflictDoNothing({
         target: [repositories.userId, repositories.sourceId, repositories.normalizedFullName],
       });
 
     createMirrorJob({
       userId,
-      organizationId: metadata.organization,
-      organizationName: metadata.organization,
+      organizationId: metadata.organization ?? undefined,
+      organizationName: metadata.organization ?? undefined,
       repositoryId: metadata.id,
       repositoryName: metadata.name,
       status: "imported",

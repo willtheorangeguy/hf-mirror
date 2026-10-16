@@ -3,13 +3,13 @@
  *
  * The sources table is the authoritative home for source connections
  * (provider, instance URL, username, token). The legacy
- * configs.githubConfig connection fields stay synchronized with the FIRST
+ * configs.sourceConfig connection fields stay synchronized with the FIRST
  * source row (the "primary" source, oldest first) so un-migrated readers and
  * the existing truthiness gates keep working: zero sources means empty
  * connection fields, which reads as "not configured".
  *
  * Tokens are stored AES-256-GCM encrypted, the same convention as
- * configs.githubConfig.token, and copied between the two storages without
+ * configs.sourceConfig.token, and copied between the two storages without
  * re-encrypting. The database module is imported lazily (the same pattern as
  * loadConfigLocks) so per-test-file module mocks keep working.
  */
@@ -57,14 +57,13 @@ export class DuplicateSourceError extends Error {
   }
 }
 
-/** The display label for a source: "GitHub (octocat)", or just the provider label without a username. */
 export function deriveSourceName(provider: SourceProviderKind, username: string): string {
   const label = SOURCE_PROVIDER_LABELS[provider];
   return username ? `${label} (${username})` : label;
 }
 
 function requireProviderKind(value: unknown, label: string): SourceProviderKind {
-  if (!isSourceProviderKind(value)) {
+  if (value !== "huggingface" || !isSourceProviderKind(value)) {
     throw new Error(
       `Unknown source provider ${JSON.stringify(value)} for ${label}. Supported providers: ${SOURCE_PROVIDER_KINDS.join(", ")}.`
     );
@@ -336,7 +335,7 @@ export async function deleteSource(userId: string, sourceId: string): Promise<vo
 
 /**
  * Write-through for the legacy config: mirror the FIRST source's connection
- * fields into configs.githubConfig, or clear them when nothing is connected.
+ * fields into configs.sourceConfig, or clear them when nothing is connected.
  * The token is copied as-is (it is stored encrypted in both places).
  */
 export async function syncPrimarySourceToConfig(userId: string): Promise<void> {
@@ -354,22 +353,22 @@ export async function syncPrimarySourceToConfig(userId: string): Promise<void> {
   if (!config) return;
 
   const primary = primarySource(list);
-  const githubConfig = { ...config.githubConfig };
+  const sourceConfig = { ...config.sourceConfig };
   if (primary) {
-    githubConfig.provider = primary.provider;
-    githubConfig.url = primary.url;
-    githubConfig.owner = primary.username;
-    githubConfig.token = primary.token ?? "";
+    sourceConfig.provider = primary.provider;
+    sourceConfig.url = primary.url;
+    sourceConfig.owner = primary.username;
+    sourceConfig.token = primary.token ?? "";
   } else {
-    githubConfig.provider = "github";
-    githubConfig.url = undefined;
-    githubConfig.owner = "";
-    githubConfig.token = "";
+    sourceConfig.provider = "huggingface";
+    sourceConfig.url = undefined;
+    sourceConfig.owner = "";
+    sourceConfig.token = "";
   }
 
   await db
     .update(configs)
-    .set({ githubConfig, updatedAt: new Date() })
+    .set({ sourceConfig, updatedAt: new Date() })
     .where(eq(configs.id, config.id));
 }
 
@@ -379,7 +378,7 @@ export async function syncPrimarySourceToConfig(userId: string): Promise<void> {
  * (POST /api/config from scripts, seed data), seed the first source row from
  * them so discovery and the scheduler find something to iterate. Mirrors the
  * 0019 migration: the token is copied encrypted as-is and the provider is
- * normalized (config blobs may still hold "forgejo"/"codeberg").
+ * normalized to the supported HF provider.
  */
 export async function ensureSourcesFromConfig(userId: string): Promise<void> {
   const existing = await listSources(userId);
@@ -394,13 +393,13 @@ export async function ensureSourcesFromConfig(userId: string): Promise<void> {
     .limit(1);
   if (!config) return;
 
-  const github = config.githubConfig;
-  const username = (github?.owner ?? "").trim();
-  const token = (github?.token ?? "").trim();
+  const source = config.sourceConfig;
+  const username = (source?.owner ?? "").trim();
+  const token = (source?.token ?? "").trim();
   if (!username && !token) return;
 
-  const provider = normalizeSourceProviderKind(github?.provider);
-  const url = normalizeSourceUrl(github?.url, provider);
+  const provider = normalizeSourceProviderKind(source?.provider);
+  const url = normalizeSourceUrl(source?.url, provider);
   const sourceId = uuidv4();
   await db.insert(sources).values({
     id: sourceId,
@@ -427,7 +426,10 @@ export function findSourceForRepository(
 ): SourceConnectionForRepo {
   if (repo.sourceId) {
     const byId = list.find((source) => source.id === repo.sourceId);
-    if (byId) return byId;
+    if (byId) {
+      const origin = getRepositorySource(repo);
+      if (byId.provider === origin.provider && normalizeSourceUrl(byId.url, byId.provider) === origin.url) return byId;
+    }
   }
 
   const source = getRepositorySource(repo);
@@ -458,22 +460,10 @@ export function findSourceForOrganization(
 }
 
 /**
- * Decrypt a source token for API use. Unlike getDecryptedGitHubToken this
+ * Decrypt a source token for API use. Unlike getDecryptedSourceToken this
  * never throws: empty or missing means public-only access, which every
  * source kind supports.
  */
 export function decryptSourceToken(token: string | null | undefined): string {
   return token ? decrypt(token) : "";
-}
-
-/**
- * The REST API base for a GitHub-kind source. github.com (or empty) returns
- * undefined so the GH_API_URL environment default applies (GHES/GHEC setups
- * that predate multi-source keep working); any other URL is a GitHub
- * Enterprise instance addressed at <host>/api/v3.
- */
-export function resolveGitHubApiBaseUrl(sourceUrl: string | null | undefined): string | undefined {
-  const trimmed = sourceUrl?.trim().replace(/\/+$/, "") ?? "";
-  if (!trimmed || trimmed === "https://github.com") return undefined;
-  return `${trimmed}/api/v3`;
 }

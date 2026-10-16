@@ -24,34 +24,34 @@ describe("computeConfigLocks", () => {
 });
 
 describe("hasSourceChanged", () => {
-  test("legacy rows without a provider are GitHub and match a GitHub payload with any URL", () => {
-    expect(hasSourceChanged({}, { provider: "github", url: "https://github.com" })).toBe(false);
-    expect(hasSourceChanged({ provider: "github" }, { provider: "github", url: "" })).toBe(false);
+  test("missing provider and URL use the public Hugging Face endpoint", () => {
+    expect(hasSourceChanged({}, { provider: "huggingface", url: "https://huggingface.co" })).toBe(false);
+    expect(hasSourceChanged({ provider: "huggingface" }, { provider: "huggingface", url: "" })).toBe(false);
   });
 
   test("cosmetic URL edits are not a change, another host is", () => {
     expect(
       hasSourceChanged(
-        { provider: "gitlab", url: "https://gitlab.example.com" },
-        { provider: "gitlab", url: "GitLab.example.com/" }
+        { provider: "huggingface", url: "https://hf.example.com" },
+        { provider: "huggingface", url: "HF.example.com/" }
       )
     ).toBe(false);
-    expect(hasSourceChanged({ provider: "gitlab" }, { provider: "gitlab", url: "https://gitlab.example.com" })).toBe(true);
-    expect(hasSourceChanged({ provider: "github" }, { provider: "gitea" })).toBe(true);
+    expect(hasSourceChanged({ provider: "huggingface" }, { provider: "huggingface", url: "https://hf.example.com" })).toBe(true);
+    expect(hasSourceChanged({ provider: "huggingface" }, { provider: "huggingface", url: "https://hf.example.com" })).toBe(true);
   });
 
-  test("sourceIdentity defaults GitHub to github.com and preserves a GitHub Enterprise URL", () => {
-    expect(sourceIdentity({ provider: "github", url: "https://ghe.example.com" })).toEqual({
-      provider: "github",
-      url: "https://ghe.example.com",
+  test("sourceIdentity defaults to huggingface.co and preserves a custom endpoint", () => {
+    expect(sourceIdentity({ provider: "huggingface", url: "https://hf.example.com" })).toEqual({
+      provider: "huggingface",
+      url: "https://hf.example.com",
     });
-    expect(sourceIdentity({ provider: "github" })).toEqual({
-      provider: "github",
-      url: "https://github.com",
+    expect(sourceIdentity({ provider: "huggingface" })).toEqual({
+      provider: "huggingface",
+      url: "https://huggingface.co",
     });
     expect(hasSourceChanged(
-      { provider: "github", url: "https://ghe1.example.com" },
-      { provider: "github", url: "https://ghe2.example.com" }
+      { provider: "huggingface", url: "https://hf1.example.com" },
+      { provider: "huggingface", url: "https://hf2.example.com" }
     )).toBe(true);
   });
 });
@@ -70,8 +70,8 @@ describe("evaluateConfigChange", () => {
   const locked = computeConfigLocks({ repositoryCount: 12, mirroredCount: 4 });
   const unlocked = computeConfigLocks({ repositoryCount: 0, mirroredCount: 0 });
   const base = {
-    existingSource: { provider: "github" },
-    incomingSource: { provider: "github", url: "" },
+    existingSource: { provider: "huggingface" },
+    incomingSource: { provider: "huggingface", url: "" },
     existingDestinationUrl: "https://gitea.example.com",
     incomingDestinationUrl: "https://gitea.example.com",
   };
@@ -85,23 +85,23 @@ describe("evaluateConfigChange", () => {
       evaluateConfigChange({
         locks: unlocked,
         ...base,
-        incomingSource: { provider: "gitlab" },
+        incomingSource: { provider: "huggingface", url: "https://hf.example.com" },
         incomingDestinationUrl: "https://other.example.com",
       })
     ).toEqual({ ok: true });
   });
 
-  test("a locked source refuses a provider change without confirmation and names both hosts", () => {
+  test("a locked source refuses an endpoint change without confirmation and names both hosts", () => {
     const verdict = evaluateConfigChange({
       locks: locked,
       ...base,
-      incomingSource: { provider: "gitlab", url: "https://gitlab.example.com" },
+      incomingSource: { provider: "huggingface", url: "https://hf.example.com" },
     });
     expect(verdict.ok).toBe(false);
     if (verdict.ok) return;
     expect(verdict.lock).toBe("source");
-    expect(verdict.message).toContain("12 repositories were imported from GitHub (https://github.com)");
-    expect(verdict.message).toContain("GitLab (https://gitlab.example.com)");
+    expect(verdict.message).toContain("12 repositories were imported from Hugging Face (https://huggingface.co)");
+    expect(verdict.message).toContain("Hugging Face (https://hf.example.com)");
   });
 
   test("the confirm flag lets a locked source change through", () => {
@@ -109,7 +109,7 @@ describe("evaluateConfigChange", () => {
       evaluateConfigChange({
         locks: locked,
         ...base,
-        incomingSource: { provider: "gitlab" },
+        incomingSource: { provider: "huggingface", url: "https://hf.example.com" },
         confirmSourceChange: true,
       })
     ).toEqual({ ok: true });
@@ -139,7 +139,7 @@ describe("evaluateConfigChange", () => {
     const verdict = evaluateConfigChange({
       locks: locked,
       ...base,
-      incomingSource: { provider: "gitea" },
+      incomingSource: { provider: "huggingface", url: "https://hf.example.com" },
       incomingDestinationUrl: "https://other.example.com",
     });
     expect(verdict).toMatchObject({ ok: false, lock: "source" });

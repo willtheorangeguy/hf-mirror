@@ -58,14 +58,14 @@ export function SignupForm() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img
-              src={withBase('/logo.png')}
-              alt="Gitea Mirror Logo"
+              src={withBase('/hf-mirror.svg')}
+              alt="HF-mirror Logo"
               className="h-8 w-10"
             />
           </div>
           <CardTitle className="text-2xl">Create Admin Account</CardTitle>
           <CardDescription>
-            Set up your administrator account for Gitea Mirror
+            Set up your administrator account for HF-mirror
           </CardDescription>
         </CardHeader>
         <CardContent>

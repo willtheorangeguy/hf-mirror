@@ -115,7 +115,7 @@ export function TimeFormatToggle() {
               </span>
               <CircleCheck
                 className={cn(
-                  "h-4 w-4 text-indigo-500",
+                  "h-4 w-4 text-primary",
                   selected ? "opacity-100" : "opacity-0"
                 )}
               />

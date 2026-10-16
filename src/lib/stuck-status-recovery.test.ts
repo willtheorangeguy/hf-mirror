@@ -10,7 +10,7 @@
  * The decision logic is tested directly as pure functions. The wiring into
  * the scheduler loop, initializeRecovery, and the startup-recovery script is
  * asserted by reading the source (same pattern as
- * gitea-mirror-failure-recovery.test.ts) because behavioral tests of those
+ * hf-mirror-failure-recovery.test.ts) because behavioral tests of those
  * modules require process-wide module mocks that pollute other test files.
  */
 import { describe, test, expect } from "bun:test";

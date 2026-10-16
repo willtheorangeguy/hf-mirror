@@ -34,7 +34,7 @@
  * This test asserts on the *structure* of the source rather than
  * invoking the middleware, because exercising the middleware path
  * requires a full Astro request pipeline with heavy mocks. See
- * `gitea-mirror-failure-recovery.test.ts` and
+ * `hf-mirror-failure-recovery.test.ts` and
  * `gitea-issue-dedup-on-retry.test.ts` for the same convention.
  */
 import { describe, test, expect } from "bun:test";

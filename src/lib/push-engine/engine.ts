@@ -1,18 +1,5 @@
-/**
- * The push engine proper: keep a bare clone of the source up to date and
- * push its branches and tags to the target.
- *
- * This module knows nothing about the database. It takes a plan (where the
- * clone lives, how to reach the source, which target to push to) and
- * returns what happened, so it can be exercised with local file:// remotes.
- *
- * Only refs/heads and refs/tags travel. Hosts refuse writes to their own
- * namespaces (refs/pull on GitHub, refs/merge-requests on GitLab), so a
- * literal `push --mirror` of a clone that carried them would fail; the
- * explicit refspecs below give the same result for everything a host lets
- * us write. Force and prune are on, so a rewritten or deleted branch on the
- * source is rewritten or deleted on the target.
- */
+
+import { PendingApprovalError, protectHFHistory, transferHFLargeFiles, verifyHFRefs, type HFTransferOptions } from "./hf-transfer";
 import { mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { GitCommandError, parseRefList, runGit, type GitCredentials } from "./git";
@@ -25,7 +12,12 @@ export const MIRROR_REFSPECS = ["+refs/heads/*:refs/heads/*", "+refs/tags/*:refs
 /** Refs per push when the single mirror push is refused for size. */
 export const PUSH_BATCH_SIZE = 50;
 
+function mirrorRefspecs(plan: PushMirrorPlan): string[] {
+  return [...MIRROR_REFSPECS, ...(plan.hf ? ["+refs/hf-mirror/pr/*:refs/hf-mirror/pr/*"] : [])];
+}
+
 export interface PushMirrorPlan {
+  hf?: HFTransferOptions;
   clonePath: string;
   sourceCloneUrl: string;
   sourceCredentials: GitCredentials | null;
@@ -88,12 +80,32 @@ async function execute(plan: PushMirrorPlan): Promise<PushMirrorOutcome> {
     log(`created ${targetRepository.owner}/${targetRepository.name} on ${plan.target.baseUrl}`);
   }
 
+  if (plan.hf) {
+    try { await protectHFHistory(plan, targetRepository, refsAfter); }
+    catch (error) {
+      if (error instanceof PendingApprovalError || plan.hf.blockOnBackupFailure !== false) throw error;
+      log("Safety snapshot failed; continuing because Block sync when snapshot fails is disabled");
+    }
+    await transferHFLargeFiles(plan, targetRepository.pushUrl);
+  }
+
   const { pushed, batches } = targetRepository.created
     ? await pushWhenReady(plan, targetRepository.pushUrl, refsAfter, log)
     : await pushAll(plan, targetRepository.pushUrl, refsAfter, log);
   log(pushed ? `pushed to ${targetRepository.htmlUrl}` : `${targetRepository.htmlUrl} was already up to date`);
 
-  const wanted = plan.defaultBranch?.trim();
+  if (plan.hf) await verifyHFRefs(plan, targetRepository.pushUrl, refsAfter);
+
+  let wanted = plan.defaultBranch?.trim();
+  if (plan.hf) {
+    // HF normally uses main, but the advertised default branch is authoritative.
+    const head = await runGit(["ls-remote", "--symref", plan.sourceCloneUrl, "HEAD"], { credentials: plan.sourceCredentials });
+    const advertised = head.stdout.match(/^ref:\s+refs\/heads\/(.+)\s+HEAD$/m)?.[1]?.trim();
+    if (advertised && refsAfter.has(`refs/heads/${advertised}`)) {
+      wanted = advertised;
+      await runGit(["-C", plan.clonePath, "symbolic-ref", "HEAD", `refs/heads/${advertised}`]);
+    }
+  }
   if (
     wanted &&
     refsAfter.has(`refs/heads/${wanted}`) &&
@@ -133,9 +145,14 @@ export async function isHealthyBareClone(clonePath: string): Promise<boolean> {
 async function configureClone(plan: PushMirrorPlan): Promise<void> {
   const { clonePath, sourceCloneUrl } = plan;
   await runGit(["-C", clonePath, "remote", "set-url", "origin", sourceCloneUrl]);
+  if (plan.hf) {
+    const stale = await runGit(["-C", clonePath, "for-each-ref", "--format=%(refname)", "refs/hf-target"]);
+    for (const ref of stale.stdout.split(/\r?\n/).filter(Boolean)) await runGit(["-C", clonePath, "update-ref", "-d", ref]);
+  }
   // Exactly two fetch refspecs, whatever an earlier run left behind.
   await runGit(["-C", clonePath, "config", "--replace-all", "remote.origin.fetch", MIRROR_REFSPECS[0]]);
   await runGit(["-C", clonePath, "config", "--add", "remote.origin.fetch", MIRROR_REFSPECS[1]]);
+  if (plan.hf) await runGit(["-C", clonePath, "config", "--add", "remote.origin.fetch", "+refs/pr/*:refs/hf-mirror/pr/*"]);
 }
 
 async function ensureClone(
@@ -178,6 +195,7 @@ export async function listRefs(clonePath: string): Promise<Map<string, string>> 
     "--format=%(objectname) %(refname)",
     "refs/heads",
     "refs/tags",
+    "refs/hf-mirror/pr",
   ]);
   return parseRefList(stdout);
 }
@@ -229,7 +247,7 @@ async function pushAll(
 
   try {
     const { stdout } = await runGit(
-      ["-C", clonePath, "push", "--no-progress", "--prune", "--porcelain", pushUrl, ...MIRROR_REFSPECS],
+      ["-C", clonePath, "push", "--no-progress", "--prune", "--porcelain", pushUrl, ...mirrorRefspecs(plan)],
       { credentials }
     );
     const parsed = parsePushPorcelain(stdout);
@@ -243,7 +261,8 @@ async function pushAll(
   const heads = [...refs.keys()].filter((ref) => ref.startsWith("refs/heads/"));
   const tags = [...refs.keys()].filter((ref) => ref.startsWith("refs/tags/"));
   let batches = 0;
-  for (const group of [heads, tags]) {
+  const prs = [...refs.keys()].filter(ref => ref.startsWith("refs/hf-mirror/pr/"));
+  for (const group of [heads, tags, prs]) {
     for (let i = 0; i < group.length; i += PUSH_BATCH_SIZE) {
       const chunk = group.slice(i, i + PUSH_BATCH_SIZE).map((ref) => `+${ref}:${ref}`);
       batches += 1;
@@ -260,7 +279,7 @@ async function pushAll(
   }
   // The batches only added and updated refs; a final prune removes what the source dropped.
   batches += 1;
-  await runGit(["-C", clonePath, "push", "--no-progress", "--prune", "--porcelain", pushUrl, ...MIRROR_REFSPECS], {
+  await runGit(["-C", clonePath, "push", "--no-progress", "--prune", "--porcelain", pushUrl, ...mirrorRefspecs(plan)], {
     credentials,
   });
   return { pushed: true, batches };
@@ -277,11 +296,6 @@ export function isTargetNotReady(error: unknown): boolean {
   return TARGET_NOT_READY.test(`${error.message}\n${error.stderr}`);
 }
 
-/**
- * First push into a repository this run created. GitLab (and sometimes
- * GitHub) answer "not found" for a second or two after the create call
- * returns, so a not-found here is retried a few times before it counts.
- */
 async function pushWhenReady(
   plan: PushMirrorPlan,
   pushUrl: string,

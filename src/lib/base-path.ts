@@ -1,5 +1,5 @@
 const URL_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
-const BASE_PATH_WINDOW_KEY = "__GITEA_MIRROR_BASE_PATH__";
+const BASE_PATH_WINDOW_KEY = "__HF_MIRROR_BASE_PATH__";
 
 function normalizeBasePath(basePath: string | null | undefined): string {
   if (!basePath) {

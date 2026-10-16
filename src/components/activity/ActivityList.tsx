@@ -65,7 +65,7 @@ export const STATUS_PRESENTATION: Record<
     label: 'Syncing in progress',
     short: 'syncing',
     tone: 'text-indigo-600 dark:text-indigo-400',
-    wash: 'bg-indigo-500/10',
+    wash: 'bg-primary/10',
     spin: true,
   },
   mirroring: {
@@ -198,7 +198,6 @@ function RowBody({
     </>
   );
 }
-
 
 interface ActivityListProps {
   /** Already filtered by ActivityLog. */

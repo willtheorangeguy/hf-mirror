@@ -1,9 +1,13 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 
 // Mock fetch globally before importing the module
 let mockFetch: ReturnType<typeof mock>;
+let originalFetch: typeof fetch;
+
+afterEach(() => { globalThis.fetch = originalFetch; });
 
 beforeEach(() => {
+  originalFetch = globalThis.fetch;
   mockFetch = mock(() =>
     Promise.resolve(new Response("ok", { status: 200 }))
   );
@@ -105,7 +109,7 @@ describe("sendNotification", () => {
       notifyOnSyncSuccess: true,
       notifyOnNewRepo: false,
       webhook: {
-        url: "https://example.com/hooks/gitea-mirror",
+        url: "https://example.com/hooks/hf-mirror",
       },
     };
 
@@ -117,7 +121,7 @@ describe("sendNotification", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toBe("https://example.com/hooks/gitea-mirror");
+    expect(url).toBe("https://example.com/hooks/hf-mirror");
     const body = JSON.parse(opts.body);
     expect(body.title).toBe("Test");
     expect(body.type).toBe("sync_success");
@@ -338,7 +342,7 @@ describe("buildNewRepositoriesNotificationEvent", () => {
     const event = buildNewRepositoriesNotificationEvent({
       groupLabel: "gitea",
       repositoryNames: ["gitea/alpha", "gitea/beta"],
-      details: "Discovered during scheduled sync on source github.",
+      details: "Discovered during scheduled sync on source huggingface.",
     });
 
     expect(event.type).toBe("new_repo");
@@ -346,7 +350,7 @@ describe("buildNewRepositoriesNotificationEvent", () => {
     expect(event.message).toContain("2 new repositories discovered for gitea:");
     expect(event.message).toContain("- gitea/alpha");
     expect(event.message).toContain("- gitea/beta");
-    expect(event.message).toContain("Details: Discovered during scheduled sync on source github.");
+    expect(event.message).toContain("Details: Discovered during scheduled sync on source huggingface.");
   });
 
   test("uses the singular wording for a single repository", () => {

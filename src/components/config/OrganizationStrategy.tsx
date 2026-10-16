@@ -16,7 +16,7 @@ interface OrganizationStrategyProps {
   starredReposOrg?: string;
   starredReposMode?: StarredReposMode;
   onStrategyChange: (strategy: MirrorStrategy) => void;
-  githubUsername?: string;
+  sourceUsername?: string;
   giteaUsername?: string;
 }
 
@@ -24,7 +24,7 @@ const strategyConfig = {
   preserve: {
     title: "Preserve Structure",
     icon: FolderTree,
-    description: "Keep the exact same org structure as GitHub",
+    description: "Keep the exact same org structure as Hugging Face",
     color: "text-blue-600 dark:text-blue-400",
     bgColor: "bg-blue-50 dark:bg-blue-950/20",
     borderColor: "border-blue-200 dark:border-blue-900",
@@ -71,33 +71,33 @@ const strategyConfig = {
   }
 };
 
-const MappingPreview: React.FC<{ 
+const MappingPreview: React.FC<{
   strategy: MirrorStrategy;
   config: typeof strategyConfig.preserve;
   destinationOrg?: string;
   starredReposOrg?: string;
   starredReposMode?: StarredReposMode;
-  githubUsername?: string;
+  sourceUsername?: string;
   giteaUsername?: string;
-}> = ({ strategy, config, destinationOrg, starredReposOrg, starredReposMode, githubUsername, giteaUsername }) => {
-  const displayGithubUsername = githubUsername || "<username>";
+}> = ({ strategy, config, destinationOrg, starredReposOrg, starredReposMode, sourceUsername, giteaUsername }) => {
+  const displaySourceUsername = sourceUsername || "<username>";
   const displayGiteaUsername = giteaUsername || "<username>";
-  const isGithubPlaceholder = !githubUsername;
+  const isSourcePlaceholder = !sourceUsername;
   const isGiteaPlaceholder = !giteaUsername;
   const starredDestination =
     (starredReposMode || "dedicated-org") === "preserve-owner"
       ? "awesome/starred-repo"
       : `${starredReposOrg || "starred"}/starred-repo`;
-  
+
   if (strategy === "preserve") {
     return (
       <div className="flex items-center justify-between gap-6">
         <div className="flex-1">
-          <div className="text-xs font-medium text-muted-foreground mb-2">GitHub</div>
+          <div className="text-xs font-medium text-muted-foreground mb-2">Hugging Face</div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <User className="h-3 w-3" />
-              <span className={cn(isGithubPlaceholder && "text-muted-foreground italic")}>{displayGithubUsername}/my-repo</span>
+              <span className={cn(isSourcePlaceholder && "text-muted-foreground italic")}>{displaySourceUsername}/my-repo</span>
             </div>
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <Building2 className="h-3 w-3" />
@@ -109,11 +109,11 @@ const MappingPreview: React.FC<{
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center">
           <GitBranch className="h-4 w-4 text-muted-foreground" />
         </div>
-        
+
         <div className="flex-1">
           <div className="text-xs font-medium text-muted-foreground mb-2">Gitea</div>
           <div className="space-y-1.5">
@@ -139,11 +139,11 @@ const MappingPreview: React.FC<{
     return (
       <div className="flex items-center justify-between gap-6">
         <div className="flex-1">
-          <div className="text-xs font-medium text-muted-foreground mb-2">GitHub</div>
+          <div className="text-xs font-medium text-muted-foreground mb-2">Hugging Face</div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <User className="h-3 w-3" />
-              <span className={cn(isGithubPlaceholder && "text-muted-foreground italic")}>{displayGithubUsername}/my-repo</span>
+              <span className={cn(isSourcePlaceholder && "text-muted-foreground italic")}>{displaySourceUsername}/my-repo</span>
             </div>
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <Building2 className="h-3 w-3" />
@@ -155,21 +155,21 @@ const MappingPreview: React.FC<{
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center">
           <GitBranch className="h-4 w-4 text-muted-foreground" />
         </div>
-        
+
         <div className="flex-1">
           <div className="text-xs font-medium text-muted-foreground mb-2">Gitea</div>
           <div className="space-y-1.5">
             <div className={cn("flex items-center gap-2 p-1.5 rounded text-xs", config.repoColors.bg)}>
               <Building2 className={cn("h-3 w-3", config.repoColors.icon)} />
-              <span>{destinationOrg || "github-mirrors"}/my-repo</span>
+              <span>{destinationOrg || "hf-mirrors"}/my-repo</span>
             </div>
             <div className={cn("flex items-center gap-2 p-1.5 rounded text-xs", config.repoColors.bg)}>
               <Building2 className={cn("h-3 w-3", config.repoColors.icon)} />
-              <span>{destinationOrg || "github-mirrors"}/team-repo</span>
+              <span>{destinationOrg || "hf-mirrors"}/team-repo</span>
             </div>
             <div className={cn("flex items-center gap-2 p-1.5 rounded text-xs", config.repoColors.bg)}>
               <Building2 className={cn("h-3 w-3", config.repoColors.icon)} />
@@ -185,11 +185,11 @@ const MappingPreview: React.FC<{
     return (
       <div className="flex items-center justify-between gap-6">
         <div className="flex-1">
-          <div className="text-xs font-medium text-muted-foreground mb-2">GitHub</div>
+          <div className="text-xs font-medium text-muted-foreground mb-2">Hugging Face</div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <User className="h-3 w-3" />
-              <span className={cn(isGithubPlaceholder && "text-muted-foreground italic")}>{displayGithubUsername}/my-repo</span>
+              <span className={cn(isSourcePlaceholder && "text-muted-foreground italic")}>{displaySourceUsername}/my-repo</span>
             </div>
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <Building2 className="h-3 w-3" />
@@ -201,11 +201,11 @@ const MappingPreview: React.FC<{
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center">
           <GitBranch className="h-4 w-4 text-muted-foreground" />
         </div>
-        
+
         <div className="flex-1">
           <div className="text-xs font-medium text-muted-foreground mb-2">Gitea</div>
           <div className="space-y-1.5">
@@ -231,11 +231,11 @@ const MappingPreview: React.FC<{
     return (
       <div className="flex items-center justify-between gap-6">
         <div className="flex-1">
-          <div className="text-xs font-medium text-muted-foreground mb-2">GitHub</div>
+          <div className="text-xs font-medium text-muted-foreground mb-2">Hugging Face</div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <User className="h-3 w-3" />
-              <span className={cn(isGithubPlaceholder && "text-muted-foreground italic")}>{displayGithubUsername}/my-repo</span>
+              <span className={cn(isSourcePlaceholder && "text-muted-foreground italic")}>{displaySourceUsername}/my-repo</span>
             </div>
             <div className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
               <Building2 className="h-3 w-3" />
@@ -247,17 +247,17 @@ const MappingPreview: React.FC<{
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center">
           <GitBranch className="h-4 w-4 text-muted-foreground" />
         </div>
-        
+
         <div className="flex-1">
           <div className="text-xs font-medium text-muted-foreground mb-2">Gitea</div>
           <div className="space-y-1.5">
             <div className={cn("flex items-center gap-2 p-1.5 rounded text-xs", config.repoColors.bg)}>
               <Building2 className={cn("h-3 w-3", config.repoColors.icon)} />
-              <span>{destinationOrg || "github-mirrors"}/my-repo</span>
+              <span>{destinationOrg || "hf-mirrors"}/my-repo</span>
             </div>
             <div className={cn("flex items-center gap-2 p-1.5 rounded text-xs", config.repoColors.bg)}>
               <Building2 className={cn("h-3 w-3", config.repoColors.icon)} />
@@ -272,7 +272,7 @@ const MappingPreview: React.FC<{
       </div>
     );
   }
-  
+
   return null;
 };
 
@@ -282,7 +282,7 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
   starredReposOrg,
   starredReposMode,
   onStrategyChange,
-  githubUsername,
+  sourceUsername,
   giteaUsername,
 }) => {
   return (
@@ -293,11 +293,11 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
             Organization strategy
           </span>
         </div>
-        
+
         <div className="flex-shrink-0">
           <HoverCard openDelay={200}>
             <HoverCardTrigger asChild>
-              <button 
+              <button
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                 type="button"
               >
@@ -313,7 +313,7 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
                     After selecting a strategy, you can customize destinations for specific organizations and repositories.
                   </p>
                 </div>
-                
+
                 <div className="space-y-2.5 pt-2 border-t">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
                       Click the edit button on any organization card to redirect all its repositories to a different Gitea organization.
                     </p>
                   </div>
-                  
+
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <GitBranch className="h-3.5 w-3.5 text-primary" />
@@ -334,18 +334,18 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
                       Use the inline editor in the repository table's "Destination" column to set custom destinations for individual repositories.
                     </p>
                   </div>
-                  
+
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <Star className="h-3.5 w-3.5 text-yellow-500" />
-                      <span className="text-xs font-medium">Starred Repositories</span>
+                      <span className="text-xs font-medium">Liked Repositories</span>
                     </div>
                     <p className="text-xs text-muted-foreground pl-5">
                       Follow your starred-repo mode and cannot be overridden per repository.
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="pt-2 border-t">
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium">Priority:</span> Repository override → Organization override → Strategy default
@@ -372,7 +372,7 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
               className={cn(
                 "flex items-start gap-3 rounded-lg border p-3.5 text-left transition-colors",
                 isSelected
-                  ? "border-indigo-500 bg-indigo-500/10"
+                  ? "border-indigo-500 bg-primary/10"
                   : "border-border hover:border-muted-foreground/40"
               )}
             >
@@ -415,7 +415,7 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
                           destinationOrg={destinationOrg}
                           starredReposOrg={starredReposOrg}
                           starredReposMode={starredReposMode}
-                          githubUsername={githubUsername}
+                          sourceUsername={sourceUsername}
                           giteaUsername={giteaUsername}
                         />
                       </div>
@@ -428,7 +428,7 @@ export const OrganizationStrategy: React.FC<OrganizationStrategyProps> = ({
               </span>
 
               {isSelected && (
-                <CircleCheck className="h-4 w-4 shrink-0 text-indigo-500" />
+                <CircleCheck className="h-4 w-4 shrink-0 text-primary" />
               )}
             </button>
           );

@@ -1,9 +1,4 @@
-/**
- * Small fetch wrapper shared by the GitLab and Gitea adapters.
- *
- * Deliberately built on the global fetch so tests can swap it out, and free
- * of database imports so the adapters stay pure.
- */
+
 
 import { safeFetch } from "@/lib/utils/outbound-url";
 

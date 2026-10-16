@@ -9,8 +9,7 @@
  */
 
 import type { Repository } from "@/lib/db/schema";
-import type { GiteaRepoInfo } from "@/lib/gitea-enhanced";
-import { cloneUrlsMatch } from "@/lib/utils/mirror-source-match";
+import type { GiteaRepoInfo } from "@/lib/destination-api";
 
 export type MoveOutcome =
   /** The destination moved the repository. */
@@ -32,6 +31,7 @@ export interface MoveResult {
 }
 
 export type MoveErrorCode =
+  | "repository-busy"
   | "destination-unsupported"
   | "destination-mismatch"
   | "not-on-destination"
@@ -75,15 +75,6 @@ export function ownerLogin(info: GiteaRepoInfo | null | undefined): string {
  * original_url, because the location came from our own success path; a
  * mirror whose original_url names another source is not ours.
  */
-export function isRecordedMirror(
-  info: GiteaRepoInfo | null,
-  sourceCloneUrl?: string | null
-): boolean {
-  if (!info || !info.mirror) return false;
-  const original = typeof info.original_url === "string" ? info.original_url.trim() : "";
-  if (!original) return true;
-  return cloneUrlsMatch(original, sourceCloneUrl);
-}
 
 export interface MovePlanEntry {
   id: string;

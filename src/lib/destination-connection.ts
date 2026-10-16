@@ -6,6 +6,7 @@
  * and the guard that stops a repository from being pushed to a host other
  * than the one it was mirrored to.
  */
+import { GiteaPushTarget } from "./push-engine/targets/gitea";
 import type { Config, Repository } from "@/lib/db/schema";
 import { getDecryptedGiteaToken } from "@/lib/utils/config-encryption";
 import {
@@ -20,7 +21,7 @@ import {
   type RepositoryDestination,
   type RepositoryDestinationFields,
 } from "./destination-kinds";
-import { createPushTarget, type PushTarget } from "./push-engine/targets";
+import { type PushTarget } from "./push-engine/targets";
 
 export interface DestinationConnection extends RepositoryDestination {
   /** The account the token belongs to on the destination. */
@@ -41,7 +42,7 @@ export function usesPushEngine(config: Partial<Config> | null | undefined): bool
 
 export function resolvePushDestinationKind(config: Partial<Config>): PushDestinationKind {
   const kind = resolveDestinationKind(config);
-  if (!isPushDestinationKind(kind)) {
+  if (!isPushDestinationKind(kind) && kind !== "gitea" && kind !== "forgejo") {
     throw new Error(`The configured destination (${kind}) is not a push target.`);
   }
   return kind;
@@ -67,18 +68,12 @@ export function resolveDestinationConnection(
   };
 }
 
-/** The push target adapter for a config whose destination is GitHub or GitLab. */
 export function createPushTargetFromConfig(config: Partial<Config>): PushTarget {
   const kind = resolvePushDestinationKind(config);
+  if (kind !== "gitea" && kind !== "forgejo") throw new Error("HF-mirror requires a Gitea or Forgejo destination");
   const connection = resolveDestinationConnection(config);
-  if (!connection.token) {
-    throw new Error(`A ${kind === "gitlab" ? "GitLab" : "GitHub"} token is required to push mirrors.`);
-  }
-  return createPushTarget(kind, {
-    url: connection.url,
-    username: connection.username,
-    token: connection.token,
-  });
+  if (!connection.token) throw new Error("A Gitea or Forgejo token is required to push mirrors.");
+  return new GiteaPushTarget(connection, config.giteaConfig?.createOrg !== false);
 }
 
 /**

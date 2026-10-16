@@ -1,11 +1,15 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import { sendNtfyNotification, type NotificationEvent } from "./ntfy";
 import type { NtfyConfig } from "@/types/config";
 
 describe("sendNtfyNotification", () => {
   let mockFetch: ReturnType<typeof mock>;
+  let originalFetch: typeof fetch;
+
+  afterEach(() => { globalThis.fetch = originalFetch; });
 
   beforeEach(() => {
+    originalFetch = globalThis.fetch;
     mockFetch = mock(() =>
       Promise.resolve(new Response("ok", { status: 200 }))
     );
@@ -14,7 +18,7 @@ describe("sendNtfyNotification", () => {
 
   const baseConfig: NtfyConfig = {
     url: "https://ntfy.sh",
-    topic: "gitea-mirror",
+    topic: "hf-mirror",
     priority: "default",
   };
 
@@ -29,7 +33,7 @@ describe("sendNtfyNotification", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toBe("https://ntfy.sh/gitea-mirror");
+    expect(url).toBe("https://ntfy.sh/hf-mirror");
   });
 
   test("strips trailing slash from URL", async () => {
@@ -39,7 +43,7 @@ describe("sendNtfyNotification", () => {
     );
 
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toBe("https://ntfy.sh/gitea-mirror");
+    expect(url).toBe("https://ntfy.sh/hf-mirror");
   });
 
   test("includes Authorization header when token is present", async () => {
@@ -88,7 +92,7 @@ describe("sendNtfyNotification", () => {
     );
     globalThis.fetch = mockFetch as any;
 
-    expect(
+    await expect(
       sendNtfyNotification(baseConfig, baseEvent)
     ).rejects.toThrow("Ntfy error: 429");
   });

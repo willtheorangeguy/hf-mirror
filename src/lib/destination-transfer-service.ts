@@ -6,6 +6,8 @@
  * is left where it is for the user to remove.
  */
 
+import { isHFDestinationRepository } from "./hf-identity";
+
 import { and, asc, eq } from "drizzle-orm";
 import { db, repositories } from "@/lib/db";
 import type { Repository } from "@/lib/db/schema";
@@ -15,26 +17,18 @@ import { decryptConfigTokens } from "@/lib/utils/config-encryption";
 import {
   findGiteaMirrorBySource,
   getGiteaRepoInfo,
-  getOrCreateGiteaOrgEnhanced,
+  getOrCreateGiteaOrg,
   transferGiteaRepo,
   type GiteaTransferResult,
-} from "@/lib/gitea-enhanced";
-import { isMirrorOfSource } from "@/lib/utils/mirror-source-match";
+} from "@/lib/destination-api";
+
 import {
   assertRepositoryMatchesConfiguredDestination,
   usesPushEngine,
 } from "@/lib/destination-connection";
 import { createMirrorJob } from "@/lib/helpers";
 import { processInParallel } from "@/lib/utils/concurrency";
-import {
-  MoveMirrorError,
-  isRecordedMirror,
-  ownerLogin,
-  planOrganizationMove,
-  splitLocation,
-  type MoveResult,
-  type OrganizationMoveResult,
-} from "@/lib/destination-transfer";
+import { MoveMirrorError, ownerLogin, planOrganizationMove, splitLocation, type MoveResult, type OrganizationMoveResult } from "@/lib/destination-transfer";
 
 const ORG_MOVE_CONCURRENCY = 2;
 
@@ -77,7 +71,7 @@ export async function ensureDestinationOwner({
     if (!(error instanceof HttpError) || error.status !== 404) throw error;
   }
 
-  await getOrCreateGiteaOrgEnhanced({ orgName: owner, config });
+  await getOrCreateGiteaOrg({ orgName: owner, config });
 }
 
 const defaultDeps: MoveDeps = {
@@ -187,14 +181,16 @@ export async function moveMirror({
   const io: MoveDeps = { ...defaultDeps, ...deps };
   const target = newOwner.trim();
 
-  if (usesPushEngine(config)) {
+  if (usesPushEngine(config) && config.sourceConfig?.provider !== "huggingface") {
     throw new MoveMirrorError(
-      "Moving a mirror needs a Gitea or Forgejo destination. On GitHub and GitLab the push engine keeps repositories where it created them.",
+      "Moving a mirror requires the configured Gitea or Forgejo destination.",
       400,
       "destination-unsupported"
     );
   }
 
+  if (repository.sourceProvider === "huggingface" && ["mirroring", "syncing"].includes(repository.status)) throw new MoveMirrorError("Wait for the active backup to finish before moving it", 409, "repository-busy");
+  const matches = (candidate: unknown) => isHFDestinationRepository(candidate, repository);
   const recorded = splitLocation(repository.mirroredLocation);
   if (!recorded) {
     return {
@@ -217,10 +213,10 @@ export async function moveMirror({
   let current = recorded;
   try {
     const atRecorded = await io.getRepoInfo({ config, owner: recorded.owner, repoName: recorded.name });
-    if (!isRecordedMirror(atRecorded, repository.cloneUrl)) {
+    if (!matches(atRecorded)) {
       const hit = await io.searchBySource({ config, repository });
       const hitOwner = ownerLogin(hit);
-      if (hit && hitOwner && hit.name && isMirrorOfSource(hit, repository.cloneUrl)) {
+      if (hit && hitOwner && hit.name && matches(hit)) {
         current = { owner: hitOwner, name: hit.name };
       } else {
         throw new MoveMirrorError(
@@ -265,7 +261,7 @@ export async function moveMirror({
     );
   }
   if (atTarget) {
-    if (isMirrorOfSource(atTarget, repository.cloneUrl)) {
+    if (matches(atTarget)) {
       const location = `${ownerLogin(atTarget) || target}/${atTarget.name || current.name}`;
       await recordLocation({ userId, repository, location });
       await createMirrorJob({
@@ -372,9 +368,9 @@ export async function moveOrganizationMirrors({
   /** Where the strategy puts a row without any override; injectable for tests. */
   strategyOwnerFor?: (row: Repository) => string;
 }): Promise<OrganizationMoveResult> {
-  if (usesPushEngine(config)) {
+  if (usesPushEngine(config) && config.sourceConfig?.provider !== "huggingface") {
     throw new MoveMirrorError(
-      "Moving mirrors needs a Gitea or Forgejo destination. On GitHub and GitLab the push engine keeps repositories where it created them.",
+      "Moving mirrors requires the configured Gitea or Forgejo destination.",
       400,
       "destination-unsupported"
     );
@@ -389,7 +385,7 @@ export async function moveOrganizationMirrors({
   const override = (destinationOrg ?? "").trim();
   let resolveStrategyOwner = strategyOwnerFor;
   if (!resolveStrategyOwner) {
-    const { getGiteaRepoOwner } = await import("@/lib/gitea");
+    const { getGiteaRepoOwner } = await import("@/lib/destination-api");
     resolveStrategyOwner = (row) => getGiteaRepoOwner({ config, repository: row });
   }
   const plan = planOrganizationMove({

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Home, ArrowLeft, GitBranch, BookOpen, Settings, FileQuestion } from "lucide-react";
+import { Home, ArrowLeft, GitBranch, Settings, FileQuestion } from "lucide-react";
 import { withBase } from "@/lib/base-path";
 
 export function NotFound() {
@@ -17,7 +17,7 @@ export function NotFound() {
             The page you're looking for doesn't exist or has been moved.
           </p>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           {/* Action Buttons */}
           <div className="flex flex-col gap-3">
@@ -45,27 +45,21 @@ export function NotFound() {
 
           {/* Quick Links */}
           <div className="grid grid-cols-3 gap-3">
-            <a 
-              href={withBase("/repositories")} 
+            <a
+              href={withBase("/repositories")}
               className="flex flex-col items-center gap-2 p-3 rounded-md hover:bg-muted transition-colors"
             >
               <GitBranch className="h-5 w-5 text-muted-foreground" />
               <span className="text-xs">Repositories</span>
             </a>
-            <a 
-              href={withBase("/config")} 
+            <a
+              href={withBase("/config")}
               className="flex flex-col items-center gap-2 p-3 rounded-md hover:bg-muted transition-colors"
             >
               <Settings className="h-5 w-5 text-muted-foreground" />
               <span className="text-xs">Config</span>
             </a>
-            <a 
-              href="https://gitea-mirror.raylabs.io/docs/" 
-              className="flex flex-col items-center gap-2 p-3 rounded-md hover:bg-muted transition-colors"
-            >
-              <BookOpen className="h-5 w-5 text-muted-foreground" />
-              <span className="text-xs">Docs</span>
-            </a>
+
           </div>
 
           {/* Error Code */}

@@ -1,11 +1,6 @@
 import { JOB_HEARTBEAT_INTERVAL_MS } from "@/lib/interrupted-job-detection";
 import { isRateLimitError } from "@/lib/rate-limit-gate";
 
-/**
- * Thrown by processWithRetry when a batch stopped because the source is rate
- * limited. Carries the results gathered so far so a caller can still count
- * what was done. Shaped like a GitHub refusal so isRateLimitError matches it.
- */
 export class RateLimitedBatchError<R = unknown> extends Error {
   readonly status = 403;
   declare readonly results: R[];
@@ -36,7 +31,7 @@ export class RateLimitedBatchError<R = unknown> extends Error {
 export async function processInParallel<T, R>(
   items: T[],
   processItem: (item: T) => Promise<R>,
-  concurrencyLimit: number = 5, // Safe default for GitHub API (max 100 concurrent, but 5-10 recommended)
+  concurrencyLimit: number = 5,
   onProgress?: (completed: number, total: number, result?: R) => void,
   /**
    * Asked before each batch. Returning true ends the loop with the results
@@ -191,6 +186,7 @@ export async function processWithRetry<T, R>(
         return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        if (["PendingApprovalError", "MirrorCancelledError"].includes(lastError.name)) throw lastError;
 
         if (isRateLimitError(error)) {
           if (!rateLimitError) {

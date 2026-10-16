@@ -22,7 +22,7 @@ import {
   PlugZap,
   Trash2,
 } from "lucide-react";
-import { SiGitea, SiGithub, SiGitlab } from "react-icons/si";
+import { SiHuggingface } from "react-icons/si";
 import {
   Select,
   SelectContent,
@@ -31,15 +31,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { githubApi } from "@/lib/api";
+import { sourceApi } from "@/lib/api";
 import { withBase } from "@/lib/base-path";
 import type { SourceApiRecord, SourceProvider } from "@/types/config";
-import {
-  SOURCE_PROVIDER_DEFAULT_URLS,
-  SOURCE_PROVIDER_LABELS,
-  isBetaSourceProvider,
-  isValidSourceUrl,
-} from "@/lib/source-providers/kinds";
+import { SOURCE_PROVIDER_DEFAULT_URLS, isValidSourceUrl } from "@/lib/source-providers/kinds";
 import { invalidateConfigCache } from "@/hooks/useConfigStatus";
 import { HostLockNotice } from "./HostLockNotice";
 import { CardDivider, CardSection, SettingsCard } from "./settings-ui";
@@ -62,64 +57,18 @@ type SourceProviderMeta = {
 };
 
 const sourceProviders: SourceProviderMeta[] = [
-  {
-    value: "github",
-    label: SOURCE_PROVIDER_LABELS.github,
-    icon: SiGithub,
-    usernamePlaceholder: "Your GitHub username",
-    tokenPlaceholder: "Your GitHub token (classic)",
-    tokenHint: "Needed for private repos, organizations, and starred repositories",
-    tokenSettingsPath: "/settings/tokens",
-    tokenSteps: [
-      "GitHub → Settings → Developer settings",
-      "Personal access tokens → Generate new token (classic)",
-      "Select the scopes below and paste the token here",
-    ],
-    scopes: ["repo", "admin:org"],
-  },
-  {
-    value: "gitlab",
-    label: SOURCE_PROVIDER_LABELS.gitlab,
-    icon: SiGitlab,
-    badge: isBetaSourceProvider("gitlab") ? "BETA" : undefined,
-    usernamePlaceholder: "Your GitLab username",
-    tokenPlaceholder: "Your GitLab personal access token",
-    tokenHint: "Needed for private projects, groups, and starred projects",
-    tokenSettingsPath: "/-/user_settings/personal_access_tokens",
-    tokenSteps: [
-      "GitLab → Preferences → Access tokens",
-      "Add new token with the scopes below",
-      "Paste the token here",
-    ],
-    scopes: ["read_api", "read_repository"],
-  },
-  {
-    value: "gitea",
-    label: SOURCE_PROVIDER_LABELS.gitea,
-    icon: SiGitea,
-    badge: isBetaSourceProvider("gitea") ? "BETA" : undefined,
-    usernamePlaceholder: "Your Gitea or Forgejo username",
-    tokenPlaceholder: "Your access token",
-    tokenHint: "Needed for private repos, organizations, and starred repositories",
-    tokenSettingsPath: "/user/settings/applications",
-    tokenSteps: [
-      "Gitea → Settings → Applications",
-      "Generate a token with the permissions below",
-      "Paste the token here",
-    ],
-    scopes: ["read:repository", "read:user", "read:organization"],
-  },
+  { value: "huggingface", label: "Hugging Face", icon: SiHuggingface,
+    tokenSteps: ["Create a read token in Hugging Face Settings / Access Tokens"], tokenSettingsPath: "/settings/tokens", scopes: ["read"],
+    usernamePlaceholder: "Your Hugging Face username", tokenPlaceholder: "hf_...",
+    tokenHint: "Read access to selected private and gated repositories" },
 ];
 
 function providerMetaFor(provider: SourceProvider): SourceProviderMeta {
   return sourceProviders.find((option) => option.value === provider) ?? sourceProviders[0];
 }
 
-function providerHelp(provider: SourceProvider): string {
-  if (provider === "github") return "Where your repositories are pulled from";
-  if (provider === "gitlab")
-    return "Beta. Code, tags, wiki and LFS are mirrored. Issues, merge requests and releases need a GitHub source.";
-  return "Beta. Code, tags, releases, wiki and LFS are mirrored. Issues and pull requests need a GitHub source.";
+function providerHelp(_provider: SourceProvider): string {
+  return "Back up models, datasets, and Spaces, including large files and community discussions.";
 }
 
 function sourceHost(source: SourceApiRecord): string {
@@ -197,7 +146,7 @@ export function SourcesCard({ sources, onRefresh }: SourcesCardProps) {
 
   const editing = editor?.source ?? null;
   const editingLocked = Boolean(editing?.locked) && !editor?.sourceUnlocked;
-  const provider = editor?.provider ?? "github";
+  const provider = editor?.provider ?? "huggingface";
   const providerMeta = providerMetaFor(provider);
   const providerLabel = providerMeta.label;
   const defaultInstanceUrl = SOURCE_PROVIDER_DEFAULT_URLS[provider];
@@ -239,7 +188,7 @@ export function SourcesCard({ sources, onRefresh }: SourcesCardProps) {
   const openAddEditor = () => {
     setEditor({
       source: null,
-      provider: "github",
+      provider: "huggingface",
       url: "",
       username: "",
       token: "",
@@ -284,7 +233,7 @@ export function SourcesCard({ sources, onRefresh }: SourcesCardProps) {
     setIsTesting(true);
 
     try {
-      const result = await githubApi.testConnection(effectiveToken, {
+      const result = await sourceApi.testConnection(effectiveToken, {
         provider,
         url: editor.url.trim() || undefined,
         username: editor.username.trim() || undefined,
@@ -543,7 +492,7 @@ export function SourcesCard({ sources, onRefresh }: SourcesCardProps) {
                   rel="noopener noreferrer"
                   title={`Open ${tokenSettingsUrl.replace(/^https?:\/\//, "")}`}
                   aria-label={`Open ${providerLabel} token settings`}
-                  className="text-indigo-500 hover:text-indigo-400"
+                  className="text-primary hover:text-primary/80"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </a>

@@ -1,3 +1,4 @@
+import { BackupStatus } from "./BackupStatus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SourceIcon, repositorySourceInfo } from "@/components/source/SourceIcon";
 import { DestinationIcon, destinationInfo } from "@/components/destination/DestinationIcon";
@@ -12,11 +13,11 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FlipHorizontal, GitFork, MoreVertical, RefreshCw, RotateCcw, Star, Lock, Ban, Check, ChevronDown, SlidersHorizontal, Trash2, X } from "lucide-react";
-import { SiGithub } from "react-icons/si";
+
 import type { MirrorOverrides, Repository } from "@/lib/db/schema";
 import { repoStatusEnum, type RepoStatus } from "@/types/Repository";
 import { Button } from "@/components/ui/button";
-import { cn, formatLastSyncTime, getStatusColor } from "@/lib/utils";
+import { formatLastSyncTime, getStatusColor } from "@/lib/utils";
 import { buildGiteaWebUrl } from "@/lib/gitea-url";
 import type { FilterParams } from "@/types/filter";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -192,6 +193,12 @@ export default function RepositoryTable({
     return globals;
   }, [mirrorOptions, orgOverrides]);
 
+  const stopActiveMirror = async (id: string) => {
+    const response = await fetch(withBase("/api/job/cancel-repo"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repositoryId: id }) });
+    if (response.ok) toast.info("Cancellation requested; downloaded objects are retained");
+    else toast.error("No active mirror could be cancelled");
+  };
+
   const handleUpdateMirrorOverrides = async (
     repoId: string,
     overrides: MirrorOverrides | null
@@ -296,6 +303,7 @@ export default function RepositoryTable({
     filter.owner,
     filter.organization,
     filter.hasOverrides,
+    filter.repoType,
     // val?.toString() is undefined for an unset filter, and undefined !== ""
     // is true, so this used to report a filter on a completely clean view.
   ].some((val) => (val ?? "").toString().trim() !== "");
@@ -303,6 +311,7 @@ export default function RepositoryTable({
   const columnFilters = useMemo<ColumnFiltersState>(() => {
     const next: ColumnFiltersState = [];
 
+    if (filter.repoType) next.push({ id: "repoType", value: filter.repoType });
     if (filter.status) {
       next.push({ id: "status", value: filter.status });
     }
@@ -320,12 +329,13 @@ export default function RepositoryTable({
     }
 
     return next;
-  }, [filter.status, filter.owner, filter.organization, filter.hasOverrides]);
+  }, [filter.status, filter.owner, filter.organization, filter.hasOverrides, filter.repoType]);
 
   const sorting = useMemo(() => getTableSorting(filter.sort), [filter.sort]);
 
   const columns = useMemo<ColumnDef<Repository>[]>(
     () => [
+      { id: "repoType", accessorFn: row => row.repoType, filterFn: "equalsString" },
       {
         id: "fullName",
         accessorFn: (row) => row.fullName,
@@ -480,7 +490,7 @@ export default function RepositoryTable({
                     aria-label={`Select ${repo.name}`}
                   />
                 </div>
-                <h3 className="min-w-0 flex-1 truncate text-base font-medium">{repo.name}</h3>
+                <h3 className="min-w-0 flex-1 truncate text-base font-medium">{repo.name}</h3><Badge variant="outline" className="capitalize">{repo.repoType}</Badge><BackupStatus repository={repo} />
                 {hasMirrorOverrides(repo.mirrorOverrides) && (
                   <Badge
                     variant="outline"
@@ -498,6 +508,8 @@ export default function RepositoryTable({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {["mirroring", "syncing"].includes(repo.status) && <DropdownMenuItem onClick={() => stopActiveMirror(repo.id ?? "")}>Stop active mirror</DropdownMenuItem>}
+                    <DropdownMenuItem onClick={() => window.open(withBase(`/api/repositories/${repo.id}/archive`), "_blank", "noopener,noreferrer")}>Download metadata archive</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setOverridesTarget(repo)}>
                       <SlidersHorizontal className="h-4 w-4 mr-2" />
                       Mirror Options
@@ -509,7 +521,7 @@ export default function RepositoryTable({
                 <div className="flex flex-wrap items-center gap-2 pl-8">
                   {repo.isPrivate && <Badge variant="secondary" className="text-xs h-5"><Lock className="h-3 w-3 mr-1" />Private</Badge>}
                   {repo.isForked && <Badge variant="secondary" className="text-xs h-5"><GitFork className="h-3 w-3 mr-1" />Fork</Badge>}
-                  {repo.isStarred && <Badge variant="secondary" className="text-xs h-5"><Star className="h-3 w-3 mr-1" />Starred</Badge>}
+                  {repo.isStarred && <Badge variant="secondary" className="text-xs h-5"><Star className="h-3 w-3 mr-1" />Liked</Badge>}
                 </div>
               )}
             </div>
@@ -754,6 +766,10 @@ export default function RepositoryTable({
       </div>
 
       <div className="hidden flex-wrap items-center gap-2 lg:flex">
+        <Select value={filter.repoType || "all"} onValueChange={value => setFilter({ ...filter, repoType: value === "all" ? "" : value as "model" | "dataset" | "space" })}>
+          <SelectTrigger className="h-10 w-[150px]" aria-label="Repository type"><SelectValue placeholder="All types" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="model">Models</SelectItem><SelectItem value="dataset">Datasets</SelectItem><SelectItem value="space">Spaces</SelectItem></SelectContent>
+        </Select>
         <Select
           value={filter.status || "all"}
           onValueChange={(value) =>
@@ -1025,6 +1041,7 @@ export default function RepositoryTable({
                         <div className="flex-1 min-w-0">
                           <div className="font-medium flex items-center gap-1 min-w-0">
                             <MarqueeText>{repo.name}</MarqueeText>
+                            <Badge variant="outline" className="text-[10px] capitalize">{repo.repoType}</Badge><BackupStatus repository={repo} />
                             {repo.isStarred && (
                               <Star className="h-3 w-3 shrink-0 fill-yellow-500 text-yellow-500" />
                             )}
@@ -1032,6 +1049,7 @@ export default function RepositoryTable({
                           <MarqueeText className="text-xs text-muted-foreground">
                             {repo.fullName}
                           </MarqueeText>
+                          {repo.metadata && <a className="text-[10px] text-primary" href={withBase(`/api/repositories/${repo.id}/archive`)}>Archive</a> }
                         </div>
                         {repo.isPrivate && (
                           <span className="ml-2 shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
@@ -1123,6 +1141,7 @@ export default function RepositoryTable({
                       </div>
                       {/* Actions */}
                       <div className="h-full p-3 flex items-center justify-start flex-[1]">
+                        {["mirroring", "syncing"].includes(repo.status) && <Button size="sm" variant="outline" onClick={() => stopActiveMirror(repo.id ?? "")}>Stop</Button>}
                         <RepoActionButton
                           repo={{ id: repo.id ?? "", status: repo.status }}
                           isLoading={isLoading}

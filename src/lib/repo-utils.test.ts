@@ -6,8 +6,8 @@ function sampleRepo(overrides: Partial<GitRepo> = {}): GitRepo {
   const base: GitRepo = {
     name: 'repo',
     fullName: 'owner/repo',
-    url: 'https://github.com/owner/repo',
-    cloneUrl: 'https://github.com/owner/repo.git',
+    url: 'https://huggingface.co/owner/repo',
+    cloneUrl: 'https://huggingface.co/owner/repo.git',
     owner: 'owner',
     organization: undefined,
     mirroredLocation: '',

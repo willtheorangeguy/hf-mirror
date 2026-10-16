@@ -1,12 +1,16 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import { sendGotifyNotification } from "./gotify";
 import type { NotificationEvent } from "./ntfy";
 import type { GotifyConfig } from "@/types/config";
 
 describe("sendGotifyNotification", () => {
   let mockFetch: ReturnType<typeof mock>;
+  let originalFetch: typeof fetch;
+
+  afterEach(() => { globalThis.fetch = originalFetch; });
 
   beforeEach(() => {
+    originalFetch = globalThis.fetch;
     mockFetch = mock(() =>
       Promise.resolve(new Response("ok", { status: 200 }))
     );
@@ -99,7 +103,7 @@ describe("sendGotifyNotification", () => {
     );
     globalThis.fetch = mockFetch as any;
 
-    expect(
+    await expect(
       sendGotifyNotification(baseConfig, baseEvent)
     ).rejects.toThrow("Gotify error: 401");
   });

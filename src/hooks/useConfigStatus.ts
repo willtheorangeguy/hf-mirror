@@ -10,13 +10,13 @@ import {
 } from '@/lib/source-providers/kinds';
 
 interface ConfigStatus {
-  isGitHubConfigured: boolean;
+  isSourceConfigured: boolean;
   isGiteaConfigured: boolean;
   isFullyConfigured: boolean;
   isLoading: boolean;
   error: string | null;
   autoMirrorStarred: boolean;
-  githubOwner: string;
+  sourceOwner: string;
   sources: SourceApiRecord[];
   /** Any source row exists, including tokenless public-only sources. */
   hasAnySource: boolean;
@@ -56,21 +56,16 @@ function fetchConfigOnce(userId: string): Promise<ConfigApiResponse> {
   return tracked;
 }
 
-/**
- * Hook to check if GitHub and Gitea are properly configured
- * Returns configuration status and prevents unnecessary API calls when not configured
- * Uses caching to prevent duplicate API calls across components
- */
 export function useConfigStatus(): ConfigStatus {
   const { user } = useAuth();
   const [configStatus, setConfigStatus] = useState<ConfigStatus>({
-    isGitHubConfigured: false,
+    isSourceConfigured: false,
     isGiteaConfigured: false,
     isFullyConfigured: false,
     isLoading: true,
     error: null,
     autoMirrorStarred: false,
-    githubOwner: '',
+    sourceOwner: '',
     sources: [],
     hasAnySource: false,
     sourceProvider: DEFAULT_SOURCE_PROVIDER,
@@ -83,13 +78,13 @@ export function useConfigStatus(): ConfigStatus {
   const checkConfiguration = useCallback(async () => {
     if (!user?.id) {
       setConfigStatus({
-        isGitHubConfigured: false,
+        isSourceConfigured: false,
         isGiteaConfigured: false,
         isFullyConfigured: false,
         isLoading: false,
         error: 'No user found',
         autoMirrorStarred: false,
-        githubOwner: '',
+        sourceOwner: '',
         sources: [],
         hasAnySource: false,
         sourceProvider: DEFAULT_SOURCE_PROVIDER,
@@ -107,37 +102,36 @@ export function useConfigStatus(): ConfigStatus {
     if (isCacheValid && hasCheckedRef.current) {
       const configResponse = configCache.data!;
 
-      // Only token/url are actually required at runtime: the GitHub token is
       // self-authenticating for listForAuthenticatedUser, and a Gitea username
       // isn't needed under single-org / flat mirror strategies. Users who
-      // configure via env vars without GITHUB_USERNAME / GITEA_USERNAME set
+      // configure via env vars without HF_USERNAME / GITEA_USERNAME set
       // (or who otherwise left those blank) were being locked out of the
       // dashboard even though mirroring worked fine (see issue #271).
-      const isGitHubConfigured = !!configResponse?.githubConfig?.token;
+      const isSourceConfigured = !!configResponse?.sources?.length || !!configResponse?.sourceConfig?.username;
 
       const isGiteaConfigured = !!(
         configResponse?.giteaConfig?.url &&
         configResponse?.giteaConfig?.token
       );
 
-      const isFullyConfigured = isGitHubConfigured && isGiteaConfigured;
+      const isFullyConfigured = isSourceConfigured && isGiteaConfigured;
 
       const sources = configResponse?.sources ?? [];
 
       setConfigStatus({
-        isGitHubConfigured,
+        isSourceConfigured,
         isGiteaConfigured,
         isFullyConfigured,
         isLoading: false,
         error: null,
         autoMirrorStarred: configResponse?.advancedOptions?.autoMirrorStarred ?? false,
-        githubOwner: configResponse?.githubConfig?.username ?? '',
+        sourceOwner: configResponse?.sourceConfig?.username ?? '',
         sources,
         hasAnySource: sources.length > 0,
-        sourceProvider: normalizeSourceProviderKind(configResponse?.githubConfig?.provider),
+        sourceProvider: normalizeSourceProviderKind(configResponse?.sourceConfig?.provider),
         sourceUrl: normalizeSourceUrl(
-          configResponse?.githubConfig?.url,
-          normalizeSourceProviderKind(configResponse?.githubConfig?.provider)
+          configResponse?.sourceConfig?.url,
+          normalizeSourceProviderKind(configResponse?.sourceConfig?.provider)
         ),
       });
       return;
@@ -158,50 +152,49 @@ export function useConfigStatus(): ConfigStatus {
         userId: user.id
       };
 
-      // Only token/url are actually required at runtime: the GitHub token is
       // self-authenticating for listForAuthenticatedUser, and a Gitea username
       // isn't needed under single-org / flat mirror strategies. Users who
-      // configure via env vars without GITHUB_USERNAME / GITEA_USERNAME set
+      // configure via env vars without HF_USERNAME / GITEA_USERNAME set
       // (or who otherwise left those blank) were being locked out of the
       // dashboard even though mirroring worked fine (see issue #271).
-      const isGitHubConfigured = !!configResponse?.githubConfig?.token;
+      const isSourceConfigured = !!configResponse?.sources?.length || !!configResponse?.sourceConfig?.username;
 
       const isGiteaConfigured = !!(
         configResponse?.giteaConfig?.url &&
         configResponse?.giteaConfig?.token
       );
 
-      const isFullyConfigured = isGitHubConfigured && isGiteaConfigured;
+      const isFullyConfigured = isSourceConfigured && isGiteaConfigured;
 
       const sources = configResponse?.sources ?? [];
 
       setConfigStatus({
-        isGitHubConfigured,
+        isSourceConfigured,
         isGiteaConfigured,
         isFullyConfigured,
         isLoading: false,
         error: null,
         autoMirrorStarred: configResponse?.advancedOptions?.autoMirrorStarred ?? false,
-        githubOwner: configResponse?.githubConfig?.username ?? '',
+        sourceOwner: configResponse?.sourceConfig?.username ?? '',
         sources,
         hasAnySource: sources.length > 0,
-        sourceProvider: normalizeSourceProviderKind(configResponse?.githubConfig?.provider),
+        sourceProvider: normalizeSourceProviderKind(configResponse?.sourceConfig?.provider),
         sourceUrl: normalizeSourceUrl(
-          configResponse?.githubConfig?.url,
-          normalizeSourceProviderKind(configResponse?.githubConfig?.provider)
+          configResponse?.sourceConfig?.url,
+          normalizeSourceProviderKind(configResponse?.sourceConfig?.provider)
         ),
       });
 
       hasCheckedRef.current = true;
     } catch (error) {
       setConfigStatus({
-        isGitHubConfigured: false,
+        isSourceConfigured: false,
         isGiteaConfigured: false,
         isFullyConfigured: false,
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to check configuration',
         autoMirrorStarred: false,
-        githubOwner: '',
+        sourceOwner: '',
         sources: [],
         hasAnySource: false,
         sourceProvider: DEFAULT_SOURCE_PROVIDER,

@@ -77,7 +77,7 @@ export function OrganizationList({
   onAddOrganization,
   onRefresh,
   onDelete,
-  sourceProvider = "github",
+  sourceProvider = "huggingface",
   sourceUrl: sourceUrlProp,
   sources,
   view = "cards",
@@ -88,7 +88,7 @@ export function OrganizationList({
   const hasMultipleSources = !!sources && sources.length > 1;
   const sourceUrl =
     sourceUrlProp ??
-    normalizeSourceUrl(getCachedConfig()?.githubConfig?.url, sourceProvider);
+    normalizeSourceUrl(getCachedConfig()?.sourceConfig?.url, sourceProvider);
 
   const handleUpdateMirrorOverrides = async (
     orgId: string,
@@ -196,7 +196,6 @@ export function OrganizationList({
     return data as OrganizationMoveResult;
   };
 
-  // GitHub and GitLab destinations are pushed to; only Gitea and Forgejo can transfer a repository.
   const destination = destinationInfo(giteaConfig);
 
   // Tooltip for the destination link on a card. Named after the configured
@@ -338,7 +337,7 @@ export function OrganizationList({
         destinationLinkTooltip={destinationLinkTooltip}
         defaultDestinationFor={defaultDestinationFor}
         onUpdateDestination={handleUpdateDestination}
-        onMoveMirrors={destination.isPushTarget ? undefined : handleMoveMirrors}
+        onMoveMirrors={!destination.canTransfer ? undefined : handleMoveMirrors}
         onUpdateSource={handleUpdateSource}
         onMirror={onMirror}
         onSync={onSync}
@@ -363,8 +362,8 @@ export function OrganizationList({
         const OrgSourceIcon = SOURCE_PROVIDER_ICONS[orgSource.provider];
 
         return (
-          <Card 
-            key={index} 
+          <Card
+            key={index}
             className={cn(
               "overflow-hidden p-4 sm:p-6 transition-all hover:shadow-lg hover:border-foreground/10 w-full",
               isLoading && "opacity-75"
@@ -377,7 +376,7 @@ export function OrganizationList({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <a 
+                    <a
                       href={`${withBase('/repositories')}?organization=${encodeURIComponent(org.name || '')}`}
                       className="font-medium hover:underline cursor-pointer truncate"
                     >
@@ -438,7 +437,7 @@ export function OrganizationList({
                       if (org.forkRepositoryCount && org.forkRepositoryCount > 0) {
                         parts.push(`${org.forkRepositoryCount} fork`);
                       }
-                      
+
                       return parts.length > 0 ? (
                         <span className="ml-1">({parts.join(' | ')})</span>
                       ) : null;
@@ -461,7 +460,7 @@ export function OrganizationList({
                   defaultDestination={defaultDestinationFor(org.name!)}
                   onUpdate={(newDestination) => handleUpdateDestination(org.id!, newDestination)}
                   onMoveMirrors={
-                    destination.isPushTarget
+                    !destination.canTransfer
                       ? undefined
                       : (newDestination, dryRun) => handleMoveMirrors(org.id!, newDestination, dryRun)
                   }
@@ -490,13 +489,13 @@ export function OrganizationList({
                 <div className="flex items-start gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <a 
+                      <a
                         href={`${withBase('/repositories')}?organization=${encodeURIComponent(org.name || '')}`}
                         className="text-xl font-semibold hover:underline cursor-pointer"
                       >
                         {org.name}
                       </a>
-                      <Badge 
+                      <Badge
                         variant={org.membershipRole === "member" ? "secondary" : "default"}
                         className="capitalize"
                       >
@@ -505,7 +504,7 @@ export function OrganizationList({
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Status badge */}
                 <div className="flex items-center gap-2">
                   {hasMultipleSources && (
@@ -555,7 +554,7 @@ export function OrganizationList({
                   defaultDestination={defaultDestinationFor(org.name!)}
                   onUpdate={(newDestination) => handleUpdateDestination(org.id!, newDestination)}
                   onMoveMirrors={
-                    destination.isPushTarget
+                    !destination.canTransfer
                       ? undefined
                       : (newDestination, dryRun) => handleMoveMirrors(org.id!, newDestination, dryRun)
                   }
@@ -656,21 +655,21 @@ export function OrganizationList({
                         )}
                       </Button>
                     )}
-                    
+
                     {org.status === "mirroring" && (
                       <Button size="default" disabled variant="outline" className="w-full h-10">
                         <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                         Mirroring...
                       </Button>
                     )}
-                    
+
                     {org.status === "mirrored" && (
                       <Button size="default" disabled variant="secondary" className="w-full h-10">
                         <Check className="h-4 w-4 mr-2" />
                         Mirrored
                       </Button>
                     )}
-                    
+
                     {org.status === "failed" && (
                       <Button
                         size="default"
@@ -746,7 +745,7 @@ export function OrganizationList({
                 </Button>
               </div>
             </div>
-            
+
             {/* Desktop Actions */}
             <div className="hidden sm:flex items-center justify-between mt-4">
               <div className="flex items-center gap-2">
@@ -781,21 +780,21 @@ export function OrganizationList({
                         )}
                       </Button>
                     )}
-                    
+
                     {org.status === "mirroring" && (
                       <Button size="default" disabled variant="outline">
                         <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                         Mirroring in progress...
                       </Button>
                     )}
-                    
+
                     {org.status === "mirrored" && (
                       <Button size="default" disabled variant="secondary">
                         <Check className="h-4 w-4 mr-2" />
                         Successfully mirrored
                       </Button>
                     )}
-                    
+
                     {org.status === "failed" && (
                       <Button
                         size="default"
@@ -818,7 +817,7 @@ export function OrganizationList({
                     )}
                   </>
                 )}
-                
+
                 <OrganizationActionsMenu
                   org={org}
                   disabled={isLoading}
@@ -837,11 +836,11 @@ export function OrganizationList({
 
                   return (
                     <div className="flex items-center border rounded-md">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         asChild={!!giteaUrl}
-                        disabled={!giteaUrl} 
+                        disabled={!giteaUrl}
                         title={tooltip}
                         className="rounded-none rounded-l-md border-r"
                       >

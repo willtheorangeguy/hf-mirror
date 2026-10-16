@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "../ui/dialog";
 import { LoaderCircle, Plus } from "lucide-react";
-import { SiGithub } from "react-icons/si";
+import { SiHuggingface } from "react-icons/si";
 import type { MembershipRole } from "@/types/organizations";
 import type { SourceApiRecord } from "@/types/config";
 import { RadioGroup, RadioGroupItem } from "../ui/radio";
@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { parseGitHubOwnerReference } from "@/lib/utils/github-url";
+import { parseHFOwnerReference } from "@/lib/utils/hf-url";
 import {
   DEFAULT_SOURCE_PROVIDER,
   SOURCE_PROVIDER_DEFAULT_URLS,
@@ -71,7 +71,7 @@ export default function AddOrganizationDialog({
   isDialogOpen,
   setIsDialogOpen,
   onAddOrganization,
-  sourceProvider = "github",
+  sourceProvider = "huggingface",
   sourceUrl,
   sources,
 }: AddOrganizationDialogProps) {
@@ -155,7 +155,7 @@ export default function AddOrganizationDialog({
 
   /** Fill the name field from anything that names an account. */
   const applyReference = (value: string): boolean => {
-    const parsed = parseGitHubOwnerReference(value);
+    const parsed = parseHFOwnerReference(value);
     if (!parsed) return false;
     setOrg(parsed);
     setError("");
@@ -290,7 +290,7 @@ export default function AddOrganizationDialog({
                   <SelectContent>
                     {sources.map((source) => {
                       const SourceIcon =
-                        SOURCE_PROVIDER_ICONS[source.provider] ?? SiGithub;
+                        SOURCE_PROVIDER_ICONS[source.provider] ?? SiHuggingface;
                       return (
                         <SelectItem key={source.id} value={source.id}>
                           <span className="flex items-center gap-2">
@@ -443,12 +443,7 @@ export default function AddOrganizationDialog({
                   <RadioGroupItem value="admin" id="r2" />
                   <Label htmlFor="r2">Admin</Label>
                 </div>
-                {effectiveProvider === "github" && (
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="billing_manager" id="r3" />
-                    <Label htmlFor="r3">Billing Manager</Label>
-                  </div>
-                )}
+                {false}
               </RadioGroup>
             </div>
 

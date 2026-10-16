@@ -62,16 +62,14 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
   && rm -rf /var/lib/apt/lists/*
 # The app runs as an unprivileged user and never calls a setuid helper.
 # Dropping the bits closes the path CVE-2026-78409 and CVE-2026-78410 need
-# in mount(8); Debian ships no trixie fix for them. See .vex/README.md.
+# in mount(8); Debian ships no trixie fix for them.
 RUN find / -xdev -type f -perm /6000 -exec chmod a-s '{}' +
-# OpenVEX statements for CVEs this image cannot reach, so that
-# `docker scout cves` on the published image reports them as not affected.
-COPY .vex/*.vex.json /var/lib/db/
 COPY --from=git-lfs-builder /usr/local/bin/git-lfs /usr/local/bin/git-lfs
 RUN git lfs install
 COPY --from=pruner /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/LICENSE /app/NOTICE ./
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY --from=builder /app/scripts/runtime-server.ts ./scripts/runtime-server.ts
 COPY --from=builder /app/drizzle ./drizzle
@@ -90,20 +88,21 @@ RUN rm -rf node_modules/esbuild node_modules/@esbuild \
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=4321
-ENV DATABASE_URL=file:data/gitea-mirror.db
+ENV DATABASE_URL=file:data/hf-mirror.db
 ENV BASE_URL=/
 
 # Create directories and setup permissions
 RUN mkdir -p /app/certs && \
+  sed -i 's/\r$//' ./docker-entrypoint.sh && \
   chmod +x ./docker-entrypoint.sh && \
   mkdir -p /app/data && \
   groupadd --system --gid 1001 nodejs && \
-  useradd --system --uid 1001 --gid 1001 --create-home --home-dir /home/gitea-mirror gitea-mirror && \
-  chown -R gitea-mirror:nodejs /app/data && \
-  chown -R gitea-mirror:nodejs /app/certs && \
-  chown -R gitea-mirror:nodejs /home/gitea-mirror
+  useradd --system --uid 1001 --gid 1001 --create-home --home-dir /home/hf-mirror hf-mirror && \
+  chown -R hf-mirror:nodejs /app/data && \
+  chown -R hf-mirror:nodejs /app/certs && \
+  chown -R hf-mirror:nodejs /home/hf-mirror
 
-USER gitea-mirror
+USER hf-mirror
 
 VOLUME /app/data
 EXPOSE 4321

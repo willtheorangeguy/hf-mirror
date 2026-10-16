@@ -16,13 +16,13 @@ import { db, configs, users } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { eq, sql } from "drizzle-orm";
 import { createSecureErrorResponse } from "@/lib/utils";
-import { 
-  mapUiToDbConfig, 
-  mapDbToUiConfig, 
-  mapUiScheduleToDb, 
+import {
+  mapUiToDbConfig,
+  mapDbToUiConfig,
+  mapUiScheduleToDb,
   mapUiCleanupToDb,
   mapDbScheduleToUi,
-  mapDbCleanupToUi 
+  mapDbCleanupToUi
 } from "@/lib/utils/config-mapper";
 import { encrypt, decrypt } from "@/lib/utils/encryption";
 import { createDefaultConfig } from "@/lib/utils/config-defaults";
@@ -41,8 +41,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const userId = authResult.userId;
 
     const body = await request.json();
+    if (body.sourceConfig?.provider && body.sourceConfig.provider !== "huggingface") return new Response(JSON.stringify({ success: false, message: "HF-mirror supports Hugging Face sources only" }), { status: 400 });
+    if (body.giteaConfig?.provider && !["gitea", "forgejo"].includes(body.giteaConfig.provider)) return new Response(JSON.stringify({ success: false, message: "Choose a Gitea or Forgejo destination" }), { status: 400 });
     const {
-      githubConfig,
+      sourceConfig,
       giteaConfig,
       scheduleConfig,
       cleanupConfig,
@@ -52,13 +54,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
       confirmSourceChange,
       confirmDestinationChange,
     } = body;
+    if (sourceConfig?.repoTypes !== undefined && (!Array.isArray(sourceConfig.repoTypes) || !sourceConfig.repoTypes.every((type: unknown) => ["model", "dataset", "space"].includes(type as string)))) {
+      return Response.json({ success: false, message: "repoTypes must be an array of model, dataset, or space" }, { status: 400 });
+    }
+    if (sourceConfig?.collections !== undefined && (!Array.isArray(sourceConfig.collections) || !sourceConfig.collections.every((slug: unknown) => typeof slug === "string" && /^[^/\s]+\/[^/\s]+$/.test(slug)))) {
+      return Response.json({ success: false, message: "collections must contain owner/collection slugs" }, { status: 400 });
+    }
 
-    if (!githubConfig || !giteaConfig || !scheduleConfig || !cleanupConfig || !mirrorOptions || !advancedOptions) {
+    if (!sourceConfig || !giteaConfig || !scheduleConfig || !cleanupConfig || !mirrorOptions || !advancedOptions) {
       return new Response(
         JSON.stringify({
           success: false,
           message:
-            "githubConfig, giteaConfig, scheduleConfig, cleanupConfig, mirrorOptions, and advancedOptions are required.",
+            "sourceConfig, giteaConfig, scheduleConfig, cleanupConfig, mirrorOptions, and advancedOptions are required.",
         }),
         {
           status: 400,
@@ -110,7 +118,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     }
 
-    // Validate the destination provider. GitHub and GitLab targets default to
     // their public instance when no URL is given.
     if (giteaConfig.provider !== undefined && !isDestinationProviderKind(giteaConfig.provider)) {
       return new Response(
@@ -126,16 +133,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
       giteaConfig.url = DESTINATION_PROVIDER_DEFAULT_URLS[destinationProvider];
     }
 
-    // Validate the source provider and, for GitLab and Gitea sources, the instance URL
-    if (githubConfig.provider !== undefined && !isSourceProviderKind(githubConfig.provider)) {
+    if (sourceConfig.provider !== undefined && !isSourceProviderKind(sourceConfig.provider)) {
       return new Response(
         JSON.stringify({ success: false, message: "Unknown source provider." }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
-    const sourceProvider = normalizeSourceProviderKind(githubConfig.provider);
-    if (sourceProvider !== "github") {
-      const rawSourceUrl = typeof githubConfig.url === "string" ? githubConfig.url.trim() : "";
+    const sourceProvider = normalizeSourceProviderKind(sourceConfig.provider);
+    {
+      const rawSourceUrl = typeof sourceConfig.url === "string" ? sourceConfig.url.trim() : "";
       if (rawSourceUrl && !isValidSourceUrl(rawSourceUrl)) {
         return new Response(
           JSON.stringify({
@@ -168,14 +174,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // Parse the stored configs once — used both to preserve fields the
     // Configuration form doesn't expose (e.g. env-configured mirrorInterval,
     // see issue #338) and to preserve tokens when the form submits them empty.
-    let existingGithub: Record<string, any> | undefined;
+    let existingSource: Record<string, any> | undefined;
     let existingGitea: Record<string, any> | undefined;
     if (existingConfig) {
       try {
-        existingGithub =
-          typeof existingConfig.githubConfig === "string"
-            ? JSON.parse(existingConfig.githubConfig)
-            : existingConfig.githubConfig;
+        existingSource =
+          typeof existingConfig.sourceConfig === "string"
+            ? JSON.parse(existingConfig.sourceConfig)
+            : existingConfig.sourceConfig;
 
         existingGitea =
           typeof existingConfig.giteaConfig === "string"
@@ -191,8 +197,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       const locks = await loadConfigLocks(userId);
       const verdict = evaluateConfigChange({
         locks,
-        existingSource: existingGithub,
-        incomingSource: githubConfig,
+        existingSource: existingSource,
+        incomingSource: sourceConfig,
         existingDestinationUrl: existingGitea?.url,
         incomingDestinationUrl: giteaConfig.url,
         confirmSourceChange: confirmSourceChange === true,
@@ -207,19 +213,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Map UI structure to database schema structure first
-    const { githubConfig: mappedGithubConfig, giteaConfig: mappedGiteaConfig } = mapUiToDbConfig(
-      githubConfig,
+    const { sourceConfig: mappedSourceConfig, giteaConfig: mappedGiteaConfig } = mapUiToDbConfig(
+      sourceConfig,
       giteaConfig,
       mirrorOptions,
       advancedOptions,
-      { githubConfig: existingGithub, giteaConfig: existingGitea }
+      { sourceConfig: existingSource, giteaConfig: existingGitea }
     );
 
     // Preserve tokens if fields are empty
     try {
       // Decrypt existing tokens before preserving
-      if (!mappedGithubConfig.token && existingGithub?.token) {
-        mappedGithubConfig.token = decrypt(existingGithub.token);
+      if (!mappedSourceConfig.token && existingSource?.token) {
+        mappedSourceConfig.token = decrypt(existingSource.token);
       }
 
       if (!mappedGiteaConfig.token && existingGitea?.token) {
@@ -228,12 +234,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
     } catch (tokenError) {
       console.error("Failed to preserve tokens:", tokenError);
     }
-    
+
     // Encrypt tokens before saving
-    if (mappedGithubConfig.token) {
-      mappedGithubConfig.token = encrypt(mappedGithubConfig.token);
+    if (mappedSourceConfig.token) {
+      mappedSourceConfig.token = encrypt(mappedSourceConfig.token);
     }
-    
+
     if (mappedGiteaConfig.token) {
       mappedGiteaConfig.token = encrypt(mappedGiteaConfig.token);
     }
@@ -282,7 +288,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (existingConfig) {
       // Update path
       const updateFields: Record<string, any> = {
-        githubConfig: mappedGithubConfig,
+        sourceConfig: mappedSourceConfig,
         giteaConfig: mappedGiteaConfig,
         scheduleConfig: processedScheduleConfig,
         cleanupConfig: processedCleanupConfig,
@@ -336,7 +342,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       userId,
       name: "Default Configuration",
       isActive: true,
-      githubConfig: mappedGithubConfig,
+      sourceConfig: mappedSourceConfig,
       giteaConfig: mappedGiteaConfig,
       include: [],
       exclude: [],
@@ -405,12 +411,12 @@ export const GET: APIRoute = async ({ request, locals }) => {
     if (config.length === 0) {
       // Create default configuration for the user
       const defaultConfig = await createDefaultConfig({ userId });
-      
+
       // Map the created config to UI format
       const uiConfig = mapDbToUiConfig(defaultConfig);
       const uiScheduleConfig = mapDbScheduleToUi(defaultConfig.scheduleConfig);
       const uiCleanupConfig = mapDbCleanupToUi(defaultConfig.cleanupConfig);
-      
+
       return new Response(
         JSON.stringify({
           ...defaultConfig,
@@ -429,30 +435,30 @@ export const GET: APIRoute = async ({ request, locals }) => {
 
     // Map database structure to UI structure
     const dbConfig = config[0];
-    
+
     // Decrypt tokens before sending to UI
     try {
-      const githubConfig = typeof dbConfig.githubConfig === "string"
-        ? JSON.parse(dbConfig.githubConfig)
-        : dbConfig.githubConfig;
-      
+      const sourceConfig = typeof dbConfig.sourceConfig === "string"
+        ? JSON.parse(dbConfig.sourceConfig)
+        : dbConfig.sourceConfig;
+
       const giteaConfig = typeof dbConfig.giteaConfig === "string"
         ? JSON.parse(dbConfig.giteaConfig)
         : dbConfig.giteaConfig;
-      
+
       // Decrypt tokens
-      if (githubConfig.token) {
-        githubConfig.token = decrypt(githubConfig.token);
+      if (sourceConfig.token) {
+        sourceConfig.token = decrypt(sourceConfig.token);
       }
-      
+
       if (giteaConfig.token) {
         giteaConfig.token = decrypt(giteaConfig.token);
       }
-      
+
       // Create modified config with decrypted tokens
       const decryptedConfig = {
         ...dbConfig,
-        githubConfig,
+        sourceConfig,
         giteaConfig
       };
 

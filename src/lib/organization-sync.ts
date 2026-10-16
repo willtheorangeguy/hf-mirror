@@ -11,21 +11,12 @@
  * rows another run already owns alone.
  */
 
-import type { Octokit } from "@octokit/rest";
 import { and, eq } from "drizzle-orm";
 import { db, organizations, repositories } from "@/lib/db";
 import type { Config, Repository } from "@/lib/db/schema";
-import { usesPushEngine } from "@/lib/destination-connection";
-import { createGitHubClient, createPublicGitHubClient } from "@/lib/github";
+
 import { createMirrorJob } from "@/lib/helpers";
-import {
-  decryptSourceToken,
-  findSourceForOrganization,
-  findSourceForRepository,
-  listSources,
-  resolveGitHubApiBaseUrl,
-  type SourceRecord,
-} from "@/lib/sources";
+import { findSourceForOrganization, findSourceForRepository, listSources, type SourceRecord } from "@/lib/sources";
 import { mirrorRepositoryToDestination, syncRepositoryOnDestination } from "@/lib/mirror-dispatch";
 import { rediscoverRepositoriesForOrganization, type DiscoverableOrganization } from "@/lib/organization-discovery";
 import { repoStatusEnum, repositoryVisibilityEnum } from "@/types/Repository";
@@ -79,16 +70,6 @@ export interface OrganizationSyncResult {
   failed: number;
 }
 
-/**
- * Split an organization's repository rows into what a manual sync mirrors,
- * refreshes and leaves alone.
- *
- * Forks are held back from the mirror set when the organization skips forks,
- * the same rule mirrorGitHubOrgToGitea applies, so a run never creates a
- * mirror the organization opted out of. A fork that was mirrored before the
- * opt-out is still refreshed, so an existing mirror does not silently go
- * stale.
- */
 export function partitionOrganizationRepositories(
   rows: RepositoryRow[],
   { skipForks }: { skipForks: boolean }
@@ -118,12 +99,6 @@ export function partitionOrganizationRepositories(
   return plan;
 }
 
-/**
- * The organization's repository rows. An organization pinned to one source
- * only covers that source's repositories of the name, the same rule
- * mirrorGitHubOrgToGitea applies; unpinned organizations follow every
- * connected source.
- */
 export async function selectOrganizationRepositoryRows({
   userId,
   organization,
@@ -176,72 +151,14 @@ function wasSkippedAsInFlight(result: unknown): boolean {
 }
 
 /**
- * Only GitHub sources need an API client while mirroring (metadata); other
- * hosts get code-only mirrors through the destination. One organization can
- * hold repositories from several hosts, so each row is handed a client built
- * from its own source.
- */
-function createRepositoryOctokitResolver(
-  userId: string,
-  sources: SourceRecord[]
-): (repository: Repository) => Octokit | null {
-  return (repository) => {
-    const source = findSourceForRepository(repository, sources);
-    if (!source || source.provider !== "github") return null;
-
-    const token = decryptSourceToken(source.token);
-    // A tokenless GitHub source still gets an anonymous public client
-    // (60 req/hr) so public-repo metadata mirrors; an empty token must never
-    // reach createGitHubClient, which would send `auth: ""`.
-    return token
-      ? createGitHubClient(
-          token,
-          userId,
-          source.username || undefined,
-          resolveGitHubApiBaseUrl(source.url)
-        )
-      : createPublicGitHubClient(resolveGitHubApiBaseUrl(source.url));
-  };
-}
-
-/**
  * Mirror one never-mirrored repository, the per-repository path retry-repo
  * uses: a push destination creates the target itself, a pull destination
  * needs the owning organization, which the org mirror entry point creates on
  * demand.
  */
-async function mirrorOneRepository({
-  config,
-  repository,
-  octokit,
-  sourceUsername,
-}: {
-  config: Partial<Config>;
-  repository: Repository;
-  octokit: Octokit | null;
-  sourceUsername?: string;
-}): Promise<void> {
-  if (usesPushEngine(config)) {
-    await mirrorRepositoryToDestination({ config, octokit, repository });
-    return;
-  }
-
-  const { getGiteaRepoOwnerAsync } = await import("@/lib/gitea");
-  const owner = await getGiteaRepoOwnerAsync({ config, repository, sourceUsername });
-
-  const mirrorStrategy =
-    config.githubConfig?.mirrorStrategy ||
-    (config.giteaConfig?.preserveOrgStructure ? "preserve" : "flat-user");
-  const shouldUseOrgMirror =
-    owner !== config.giteaConfig?.defaultOwner || mirrorStrategy === "single-org";
-
-  await mirrorRepositoryToDestination({
-    config,
-    octokit,
-    repository,
-    orgName: shouldUseOrgMirror ? owner : undefined,
-  });
-}
+async function mirrorOneRepository({ config, repository }: {
+  config: Partial<Config>; repository: Repository; sourceUsername?: string;
+}): Promise<void> { await mirrorRepositoryToDestination({ config, repository }); }
 
 /**
  * Run a manual sync for one organization: re-discover, mirror what was never
@@ -317,7 +234,7 @@ export async function runOrganizationSync({
       `${LOG_PREFIX} Organization ${organization.name}: mirroring ${toMirror.length}, syncing ${toSync.length}, skipping ${skipped.length} repositories`
     );
 
-    const resolveRepositoryOctokit = createRepositoryOctokitResolver(userId, sources);
+
 
     // 3. Initial mirrors.
     if (toMirror.length > 0) {
@@ -330,7 +247,7 @@ export async function runOrganizationSync({
           await mirrorOneRepository({
             config,
             repository,
-            octokit: resolveRepositoryOctokit(repository),
+
             sourceUsername: source?.username,
           });
           return row;

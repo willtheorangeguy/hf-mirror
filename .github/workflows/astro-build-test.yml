@@ -1,66 +1,35 @@
-name: Astro Build and Test
-
+name: Build and regression tests
 on:
   push:
-    branches: [ '*' ]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - 'www/**'
-      - 'helm/**'
   pull_request:
-    branches: [ '*' ]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - 'www/**'
-      - 'helm/**'
-
+  workflow_dispatch:
 permissions:
   contents: read
-  actions: read
-
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build-and-test:
-    name: Build and Test Astro Project
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-
+    timeout-minutes: 20
+    env:
+      ASTRO_TELEMETRY_DISABLED: "1"
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.13'
-
-      - name: Check lockfile and install dependencies
+          bun-version: "1.3.14"
+      - name: Install Git LFS
         run: |
-          # Check if bun.lock exists, if not check for bun.lockb
-          if [ -f "bun.lock" ]; then
-            echo "Using existing bun.lock file"
-          elif [ -f "bun.lockb" ]; then
-            echo "Found bun.lockb, creating symlink to bun.lock"
-            ln -s bun.lockb bun.lock
-          fi
-          bun install
-
-      - name: Run tests
-        run: bun test --coverage
-      
-      - name: Check Drizzle migrations
+          sudo apt-get update
+          sudo apt-get install -y git-lfs
+          git lfs install
+      - run: bun install --frozen-lockfile
+      - name: All retained regression tests (HF, auth, scheduling, APIs and notifications)
+        run: bun test --timeout 30000 --coverage
+      - name: Check migration journal
         run: bun run db:check
-
-      - name: Validate migrations (SQLite lint + upgrade path)
-        run: bun test:migrations
-
-      - name: Build Astro project
-        run: bunx --bun astro build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: astro-build
-          path: dist/
-          retention-days: 7
+      - name: Validate fresh database and migration upgrade paths
+        run: bun run test:migrations
+      - name: Build production app
+        run: bun run build

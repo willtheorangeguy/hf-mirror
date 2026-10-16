@@ -12,7 +12,7 @@
 export type TimeFormatPreference = "auto" | "12h" | "24h";
 
 export const TIME_FORMAT_STORAGE_KEY = "timeFormat";
-export const TIME_FORMAT_CHANGE_EVENT = "gitea-mirror:time-format-change";
+export const TIME_FORMAT_CHANGE_EVENT = "hf-mirror:time-format-change";
 
 export function isTimeFormatPreference(
   value: unknown

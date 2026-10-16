@@ -105,8 +105,6 @@ export function SSOSettings() {
   const buildAbsoluteAppUrl = (path: string) =>
     appOrigin ? new URL(withBase(path), appOrigin).toString() : withBase(path);
 
-
-
   useEffect(() => {
     loadData();
   }, []);
@@ -118,7 +116,7 @@ export function SSOSettings() {
         apiRequest<SSOProvider[] | { providers: SSOProvider[] }>('/sso/providers'),
         apiRequest<{ enabled: boolean }>('/auth/header-status').catch(() => ({ enabled: false }))
       ]);
-      
+
       setProviders(Array.isArray(providersRes) ? providersRes : providersRes?.providers || []);
       setHeaderAuthEnabled(headerAuthStatus.enabled);
     } catch (error) {
@@ -244,7 +242,7 @@ export function SSOSettings() {
   const startEditProvider = (provider: SSOProvider) => {
     setEditingProvider(provider);
     setProviderType(provider.samlConfig ? 'saml' : 'oidc');
-    
+
     if (provider.oidcConfig) {
       setProviderForm({
         ...providerForm,
@@ -263,7 +261,7 @@ export function SSOSettings() {
         pkce: provider.oidcConfig.pkce !== false,
       });
     }
-    
+
     setShowProviderDialog(true);
   };
 
@@ -276,8 +274,6 @@ export function SSOSettings() {
       showErrorToast(error, toast);
     }
   };
-
-
 
   if (isLoading) {
     return (
@@ -351,7 +347,7 @@ export function SSOSettings() {
           </div>
           <Dialog open={showProviderDialog} onOpenChange={setShowProviderDialog}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-indigo-500 text-white hover:bg-indigo-600">
+              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="h-4 w-4" />
                 Add provider
               </Button>
@@ -360,7 +356,7 @@ export function SSOSettings() {
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle>{editingProvider ? 'Edit SSO Provider' : 'Add SSO Provider'}</DialogTitle>
                 <DialogDescription>
-                  {editingProvider 
+                  {editingProvider
                     ? 'Update the configuration for this identity provider'
                     : 'Configure an external identity provider for user authentication'}
                 </DialogDescription>
@@ -568,8 +564,8 @@ export function SSOSettings() {
               </Tabs>
               </div>
               <DialogFooter className="flex-shrink-0 pt-4 border-t">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setShowProviderDialog(false);
                     setEditingProvider(null);
@@ -604,7 +600,7 @@ export function SSOSettings() {
                 <Button
                   onClick={createProvider}
                   disabled={addingProvider}
-                  className="bg-indigo-500 text-white hover:bg-indigo-600"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {addingProvider ? (
                     <>

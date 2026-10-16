@@ -2,7 +2,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { initializeRecovery, hasJobsNeedingRecovery, getRecoveryStatus } from './lib/recovery';
 import { startCleanupService, stopCleanupService } from './lib/cleanup-service';
 import { startSchedulerService, stopSchedulerService } from './lib/scheduler-service';
-import { startRepositoryCleanupService, stopRepositoryCleanupService } from './lib/repository-cleanup-service';
+
 import { initializeShutdownManager, registerShutdownCallback } from './lib/shutdown-manager';
 import { setupSignalHandlers } from './lib/signal-handlers';
 import { auth } from './lib/auth';
@@ -32,7 +32,7 @@ let recoveryInitialized = false;
 let recoveryInFlight = false;
 let cleanupServiceStarted = false;
 let schedulerServiceStarted = false;
-let repositoryCleanupServiceStarted = false;
+
 let shutdownManagerInitialized = false;
 let envConfigInitialized = false;
 let envConfigCheckCount = 0; // Track attempts to avoid excessive checking
@@ -104,14 +104,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // - After user creation, env vars load on next request and flag is set permanently
   if (!envConfigInitialized && envConfigCheckCount < 100) {
     envConfigCheckCount++;
-    
+
     // Only check every 10th request after the first 10 to reduce DB load
     const shouldCheck = envConfigCheckCount <= 10 || envConfigCheckCount % 10 === 0;
-    
+
     if (shouldCheck) {
       try {
         const hasUsers = await db.select().from(users).limit(1).then(u => u.length > 0);
-        
+
         if (hasUsers) {
           // We have users now, try to initialize config
           await initializeConfigFromEnv();
@@ -253,23 +253,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // Start repository cleanup service only once after recovery is complete
-  if (recoveryInitialized && !repositoryCleanupServiceStarted) {
-    try {
-      console.log('Starting repository cleanup service...');
-      startRepositoryCleanupService();
 
-      // Register repository cleanup service shutdown callback
-      registerShutdownCallback(async () => {
-        console.log('🛑 Shutting down repository cleanup service...');
-        stopRepositoryCleanupService();
-      });
-
-      repositoryCleanupServiceStarted = true;
-    } catch (error) {
-      console.error('Failed to start repository cleanup service:', error);
-      // Don't fail the request if repository cleanup service fails to start
-    }
-  }
 
   // Continue with the request
   const response = await next();

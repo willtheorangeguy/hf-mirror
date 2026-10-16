@@ -5,7 +5,7 @@
  */
 import type { Config, Repository } from "@/lib/db/schema";
 import { createPushTargetFromConfig } from "@/lib/destination-connection";
-import { getGiteaRepoOwnerAsync } from "@/lib/gitea";
+import { getGiteaRepoOwnerAsync } from "@/lib/destination-api";
 import { removeClone } from "./engine";
 import { parseMirroredLocation } from "./mirror";
 import { clonePathForRepository, type CloneRepositoryFields } from "./paths";

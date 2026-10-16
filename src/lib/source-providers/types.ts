@@ -12,7 +12,7 @@ export interface SourceConnection {
   username: string;
   /** Decrypted token. Empty means unauthenticated, public-only access. */
   token: string;
-  /** Owning user, used for rate limit tracking on GitHub. */
+
   userId?: string;
 }
 
@@ -49,6 +49,7 @@ export interface SourceAccount {
 export interface SourceRepositoryPath {
   owner: string;
   repo: string;
+  repoType?: "model" | "dataset" | "space";
 }
 
 /** One file attached to a release on a source host. */
@@ -59,13 +60,6 @@ export interface SourceReleaseAsset {
   browser_download_url: string;
 }
 
-/**
- * One release, in the shape the release mirror works on.
- *
- * Field names follow the GitHub and Gitea payloads (both use snake_case and
- * agree on every field here), so the GitHub path needed no mapping when the
- * mirror was made source agnostic (#440).
- */
 export interface SourceRelease {
   tag_name: string;
   name?: string | null;
@@ -97,7 +91,7 @@ export interface SourceProvider {
   /** Repositories the account has starred. */
   listStarredRepositories(config: Partial<Config>): Promise<GitRepo[]>;
 
-  /** Organizations (GitLab: top level groups) the account belongs to. */
+
   listOrganizations(
     config: Partial<Config>,
     skipOrgNames?: Set<string>
@@ -107,33 +101,23 @@ export interface SourceProvider {
   getOrganization(name: string): Promise<GitOrg | null>;
 
   /** Every repository in an organization the token can see. */
-  listOrganizationRepositories(name: string): Promise<GitRepo[]>;
+  listOrganizationRepositories(name: string, repoTypes?: ("model" | "dataset" | "space")[]): Promise<GitRepo[]>;
 
   /**
    * One repository, or null on a clean 404. Any other failure throws, so
    * callers that treat "gone" as destructive (cleanup) can fail safe.
    */
-  getRepository(owner: string, name: string): Promise<GitRepo | null>;
+  getRepository(owner: string, name: string, repoType?: "model" | "dataset" | "space"): Promise<GitRepo | null>;
 
   /** Whether the account currently stars the repository. Throws on errors other than 404. */
-  isRepositoryStarred(owner: string, name: string): Promise<boolean>;
+  isRepositoryStarred(owner: string, name: string, repoType?: "model" | "dataset" | "space"): Promise<boolean>;
 
-  /**
-   * The newest `limit` releases of a repository, newest first.
-   *
-   * Optional: only hosts whose API exposes releases implement it (GitHub and
-   * Gitea/Forgejo). GitLab is code only, so it leaves this out and
-   * `sourceKindSupportsReleases` keeps the release switch off for it.
-   */
+
   listReleases?(owner: string, repo: string, limit: number): Promise<SourceRelease[]>;
 
   /** Verify the token and return the account it belongs to. */
   testConnection(): Promise<SourceAccount>;
 
-  /**
-   * Turn the path segments of a pasted URL into owner and repository names
-   * the host understands. GitLab nests groups, so "group/sub/project" keeps
-   * "group/sub" as the owner. Returns null when the segments name no repo.
-   */
+
   resolveRepositoryPath(segments: string[]): SourceRepositoryPath | null;
 }

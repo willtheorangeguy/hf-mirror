@@ -10,14 +10,14 @@ let db: ReturnType<typeof drizzle>;
 
 /**
  * Resolve the SQLite file location from DATABASE_URL, falling back to the
- * historical default of <cwd>/data/gitea-mirror.db. Accepts the documented
+ * historical default of <cwd>/data/hf-mirror.db. Accepts the documented
  * sqlite:// scheme, the legacy file: scheme, or a plain path; relative
  * paths resolve against the working directory.
  */
 function resolveDbPath(): string {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) {
-    return path.join(process.cwd(), "data", "gitea-mirror.db");
+    return path.join(process.cwd(), "data", "hf-mirror.db");
   }
   const raw = url.startsWith("sqlite://")
     ? url.slice("sqlite://".length)

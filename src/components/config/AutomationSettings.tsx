@@ -8,20 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import {
-  Clock,
-  Database,
-  RefreshCw,
-  Calendar,
-  Activity,
-  Archive,
-  ArchiveRestore,
-  CircleOff,
-  Globe,
-  History,
-  Info,
-  Trash2,
-} from "lucide-react";
+import { Clock, Database, RefreshCw, Calendar, Activity, Globe, History, Info } from "lucide-react";
 import type { ScheduleConfig, DatabaseCleanupConfig } from "@/types/config";
 import { formatDate } from "@/lib/utils";
 import { useTimeFormat } from "@/hooks/useTimeFormat";
@@ -29,15 +16,7 @@ import {
   buildClockCronExpression,
   getNextCronOccurrence,
 } from "@/lib/utils/schedule-utils";
-import {
-  SettingsCard,
-  SectionTitle,
-  SwitchRow,
-  OptionTile,
-  StatusFooterItem,
-  CardDivider,
-  CardSection,
-} from "./settings-ui";
+import { SettingsCard, SectionTitle, SwitchRow, StatusFooterItem, CardDivider, CardSection } from "./settings-ui";
 import { ReconcileDestinationButton } from "./ReconcileDialog";
 
 interface AutomationSettingsProps {
@@ -104,30 +83,6 @@ function getCleanupFrequencyText(retentionSeconds: number): string {
   return "weekly";
 }
 
-const orphanActions = [
-  {
-    value: "skip" as const,
-    label: "Skip",
-    description: "Leave the mirror untouched",
-    icon: CircleOff,
-    info: "Orphaned mirrors stay exactly as they are and keep their sync settings.",
-  },
-  {
-    value: "archive" as const,
-    label: "Archive",
-    description: "Kept read-only with an archived prefix",
-    icon: Archive,
-    info: "Renames the mirror with an archived- prefix and disables automatic syncs. Nothing is lost; use Manual Sync to refresh.",
-  },
-  {
-    value: "delete" as const,
-    label: "Delete",
-    description: "Remove the mirror from Gitea",
-    icon: Trash2,
-    info: "Permanently deletes the mirror repository from Gitea.",
-  },
-];
-
 export function AutomationSettings({
   scheduleConfig,
   cleanupConfig,
@@ -153,7 +108,7 @@ export function AutomationSettings({
 
   // The stored schedule is a plain interval (seconds or a duration such as
   // 8h) rather than a clock schedule. That is what SCHEDULE_INTERVAL and
-  // GITEA_MIRROR_INTERVAL produce, and what older versions stored. The card
+  // SCHEDULE_INTERVAL produce, and what older versions stored. The card
   // only edits clock schedules, so say what actually runs instead of showing
   // the 22:00 placeholder as if it were saved (#427).
   const isIntervalSchedule = scheduleConfig.scheduleMode === "interval";
@@ -235,7 +190,7 @@ export function AutomationSettings({
                         ? formatDate(nextScheduledRun)
                         : "Calculating..."
                   }
-                  valueClassName="text-indigo-500"
+                  valueClassName="text-primary"
                 />
               ) : (
                 <span className="text-xs text-muted-foreground/70">
@@ -277,7 +232,7 @@ export function AutomationSettings({
                     <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     <span>
                       Syncing {formatIntervalSeconds(scheduleConfig.interval)}, counted from the last run.
-                      {" "}This interval comes from SCHEDULE_INTERVAL or GITEA_MIRROR_INTERVAL, which is applied again on every restart while it is set, or from an older version.
+                      {" "}This interval comes from SCHEDULE_INTERVAL, which is applied again on every restart while it is set, or from an older version.
                       {" "}Pick a frequency or start time to switch to a clock schedule.
                     </span>
                   </p>
@@ -355,7 +310,7 @@ export function AutomationSettings({
                 <SwitchRow
                   label="Auto-mirror new repositories"
                   description="Mirror repos discovered during sync automatically"
-                  info="When off, newly discovered repos are imported for browsing and wait for a manual mirror click. Starred repos have their own toggle in GitHub settings."
+                  info="When off, newly discovered repos are imported for browsing and wait for a manual mirror click. Liked repos have their own toggle in Hugging Face settings."
                   checked={scheduleConfig.autoMirror ?? false}
                   onCheckedChange={(checked) =>
                     onScheduleChange({ ...scheduleConfig, autoMirror: checked })
@@ -392,7 +347,7 @@ export function AutomationSettings({
                   icon={Calendar}
                   label="Next run"
                   value={formatDate(cleanupConfig.nextRun)}
-                  valueClassName="text-indigo-500"
+                  valueClassName="text-primary"
                 />
               ) : (
                 <span className="text-xs text-muted-foreground/70">
@@ -443,64 +398,7 @@ export function AutomationSettings({
       </div>
 
       {/* Repository Cleanup */}
-      <SettingsCard
-        icon={ArchiveRestore}
-        title="Repository Cleanup"
-        enabled={Boolean(cleanupConfig.deleteIfNotInGitHub)}
-        onEnabledChange={(checked) =>
-          onCleanupChange({ ...cleanupConfig, deleteIfNotInGitHub: checked })
-        }
-        headerAction={savingSpinner(isAutoSavingCleanup)}
-        footer={
-          <>
-            <StatusFooterItem
-              icon={Info}
-              label="Runs as part of each scheduled sync"
-            />
-            <ReconcileDestinationButton />
-          </>
-        }
-      >
-        {cleanupConfig.deleteIfNotInGitHub && (
-          <>
-            <CardSection>
-              <SectionTitle>When a GitHub repo is deleted</SectionTitle>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {orphanActions.map((action) => (
-                  <OptionTile
-                    key={action.value}
-                    icon={action.icon}
-                    label={action.label}
-                    description={action.description}
-                    info={action.info}
-                    selected={
-                      (cleanupConfig.orphanedRepoAction ?? "archive") ===
-                      action.value
-                    }
-                    onSelect={() =>
-                      onCleanupChange({
-                        ...cleanupConfig,
-                        orphanedRepoAction: action.value,
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </CardSection>
-            <CardDivider />
-            <CardSection>
-              <SwitchRow
-                label="Dry run"
-                description="Log planned actions without changing anything"
-                checked={Boolean(cleanupConfig.dryRun)}
-                onCheckedChange={(checked) =>
-                  onCleanupChange({ ...cleanupConfig, dryRun: checked })
-                }
-              />
-            </CardSection>
-          </>
-        )}
-      </SettingsCard>
+      <SettingsCard icon={RefreshCw} title="Destination reconciliation"><ReconcileDestinationButton /></SettingsCard>
     </div>
   );
 }

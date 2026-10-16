@@ -1,3 +1,4 @@
+import { sourceConfigSchema, giteaConfigSchema, scheduleConfigSchema, cleanupConfigSchema } from "@/lib/db/schema";
 import { db, configs } from "@/lib/db";
 import { eq, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
@@ -7,8 +8,8 @@ import { getNextScheduledRun, normalizeTimezone } from "@/lib/utils/schedule-uti
 export interface DefaultConfigOptions {
   userId: string;
   envOverrides?: {
-    githubToken?: string;
-    githubUsername?: string;
+    sourceToken?: string;
+    sourceUsername?: string;
     giteaUrl?: string;
     giteaExternalUrl?: string;
     giteaToken?: string;
@@ -39,21 +40,21 @@ export async function createDefaultConfig({ userId, envOverrides = {} }: Default
   }
 
   // Read environment variables for overrides
-  const githubToken = envOverrides.githubToken || process.env.GITHUB_TOKEN || "";
-  const githubUsername = envOverrides.githubUsername || process.env.GITHUB_USERNAME || "";
+  const sourceToken = envOverrides.sourceToken || process.env.HF_TOKEN || "";
+  const sourceUsername = envOverrides.sourceUsername || process.env.HF_USERNAME || "";
   const giteaUrl = envOverrides.giteaUrl || process.env.GITEA_URL || "";
   const giteaExternalUrl =
     envOverrides.giteaExternalUrl || process.env.GITEA_EXTERNAL_URL || "";
   const giteaToken = envOverrides.giteaToken || process.env.GITEA_TOKEN || "";
   const giteaUsername = envOverrides.giteaUsername || process.env.GITEA_USERNAME || "";
-  
+
   // Schedule config from env. Off unless the environment turns it on, with
   // the same rule as env-config-loader: SCHEDULE_ENABLED=true or any interval
   // variable. A fresh install used to start enabled on a plain 24h interval
   // counted from first login, which the settings card (clock mode only)
   // showed as "22:00 daily" (#427). Enabling from the card stores the clock
   // schedule and the browser timezone, so the card and the scheduler agree.
-  const envInterval = process.env.SCHEDULE_INTERVAL || process.env.GITEA_MIRROR_INTERVAL;
+  const envInterval = process.env.SCHEDULE_INTERVAL;
   const scheduleEnabled = envOverrides.scheduleEnabled ??
     (process.env.SCHEDULE_ENABLED === "true" || !!envInterval);
   const scheduleInterval = envOverrides.scheduleInterval ??
@@ -67,11 +68,11 @@ export async function createDefaultConfig({ userId, envOverrides = {} }: Default
       scheduleNextRun = new Date(Date.now() + 86400 * 1000);
     }
   }
-  
+
   // Cleanup config from env - default to ENABLED
-  const cleanupEnabled = envOverrides.cleanupEnabled ?? 
+  const cleanupEnabled = envOverrides.cleanupEnabled ??
     (process.env.CLEANUP_ENABLED === "false" ? false : true); // Default: ENABLED
-  const cleanupRetentionDays = envOverrides.cleanupRetentionDays ?? 
+  const cleanupRetentionDays = envOverrides.cleanupRetentionDays ??
     (process.env.CLEANUP_RETENTION_DAYS ? parseInt(process.env.CLEANUP_RETENTION_DAYS, 10) * 86400 : 604800); // Default: 7 days
 
   // Create default configuration
@@ -81,22 +82,25 @@ export async function createDefaultConfig({ userId, envOverrides = {} }: Default
     userId,
     name: "Default Configuration",
     isActive: true,
-    githubConfig: {
-      owner: githubUsername,
+    sourceConfig: {
+      owner: sourceUsername,
       type: "personal",
-      provider: "github",
-      token: githubToken ? encrypt(githubToken) : "",
+      provider: "huggingface",
+      token: sourceToken ? encrypt(sourceToken) : "",
+      url: "https://huggingface.co",
+      repoTypes: ["model", "dataset", "space"],
+      collections: [],
       includeStarred: false,
       includeForks: true,
       includeArchived: false,
-      includePrivate: false,
+      includePrivate: true,
       includePublic: true,
       includeOrganizations: [],
       starredReposOrg: "starred",
       starredReposMode: "dedicated-org",
       starredLists: [],
       mirrorStrategy: "preserve",
-      defaultOrg: "github-mirrors",
+      defaultOrg: "hf-mirrors",
     },
     giteaConfig: {
       url: giteaUrl,
@@ -105,13 +109,16 @@ export async function createDefaultConfig({ userId, envOverrides = {} }: Default
       token: giteaToken ? encrypt(giteaToken) : "",
       defaultOwner: giteaUsername,
       mirrorInterval: "8h",
-      lfs: false,
+      lfs: true,
       wiki: false,
       visibility: "public",
       createOrg: true,
       addTopics: true,
-      preserveVisibility: false,
+      preserveVisibility: true,
       forkStrategy: "reference",
+      mirrorMetadata: true,
+      mirrorIssues: true,
+      mirrorPullRequests: true,
       issueConcurrency: 3,
       pullRequestConcurrency: 5,
       backupStrategy: "on-force-push",
@@ -128,20 +135,13 @@ export async function createDefaultConfig({ userId, envOverrides = {} }: Default
       interval: String(scheduleInterval),
       timezone: scheduleTimezone,
       concurrent: false,
-      batchSize: 5, // Reduced from 10 to be more conservative with GitHub API limits
+      batchSize: 5,
       lastRun: null,
       nextRun: scheduleNextRun,
     },
     cleanupConfig: {
       enabled: cleanupEnabled,
       retentionDays: cleanupRetentionDays,
-      deleteFromGitea: false,
-      deleteIfNotInGitHub: true,
-      protectedRepos: [],
-      dryRun: false,
-      orphanedRepoAction: "archive",
-      batchSize: 10,
-      pauseBetweenDeletes: 2000,
       lastRun: null,
       nextRun: cleanupEnabled ? new Date(Date.now() + getCleanupInterval(cleanupRetentionDays) * 1000) : null,
     },
@@ -150,9 +150,10 @@ export async function createDefaultConfig({ userId, envOverrides = {} }: Default
   };
 
   // Insert the default config
-  await db.insert(configs).values(defaultConfig);
+  const validated = { ...defaultConfig, scheduleConfig: scheduleConfigSchema.parse({ ...defaultConfig.scheduleConfig, lastRun: undefined, nextRun: scheduleNextRun ?? undefined }), cleanupConfig: cleanupConfigSchema.parse({ ...defaultConfig.cleanupConfig, lastRun: undefined, nextRun: defaultConfig.cleanupConfig.nextRun ?? undefined }), sourceConfig: sourceConfigSchema.parse(defaultConfig.sourceConfig), giteaConfig: giteaConfigSchema.parse(defaultConfig.giteaConfig) };
+  await db.insert(configs).values(validated);
 
-  return defaultConfig;
+  return validated;
 }
 
 /**

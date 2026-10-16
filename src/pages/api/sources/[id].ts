@@ -76,9 +76,8 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
       ? body.provider
       : existing.provider;
 
-    // GitLab and Gitea sources point at an instance; GitHub needs no URL.
     if (
-      provider !== "github" &&
+      true &&
       typeof body.url === "string" &&
       body.url.trim() &&
       !isValidSourceUrl(body.url)
@@ -88,7 +87,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
         400
       );
     }
-    if (provider !== "github" && typeof body.url === "string" && body.url.trim()) {
+    if (true && typeof body.url === "string" && body.url.trim()) {
       const blocked = await blockedOutboundUrlReason(body.url);
       if (blocked) return jsonError(blocked, 400);
     }

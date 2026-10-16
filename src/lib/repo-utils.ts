@@ -4,6 +4,10 @@ import { repositories } from '@/lib/db/schema';
 import { getRepositorySource } from '@/lib/source-providers/kinds';
 import type { RepositoryDestination } from '@/lib/destination-kinds';
 
+export function normalizedRepositoryName(fullName: string, repoType = 'model', provider?: string | null): string {
+  return `${provider === 'huggingface' ? repoType + ':' : ''}${fullName}`.toLowerCase();
+}
+
 export type RepoInsert = typeof repositories.$inferInsert;
 
 // Merge lists and de-duplicate by fullName, preferring starred variant when present
@@ -13,9 +17,9 @@ export function mergeGitReposPreferStarred(
 ): GitRepo[] {
   const map = new Map<string, GitRepo>();
   for (const r of [...basicAndForked, ...starred]) {
-    const existing = map.get(r.fullName);
+    const existing = map.get(`${r.repoType ?? 'model'}:${r.fullName}`);
     if (!existing || (!existing.isStarred && r.isStarred)) {
-      map.set(r.fullName, r);
+      map.set(`${r.repoType ?? 'model'}:${r.fullName}`, r);
     }
   }
   return Array.from(map.values());
@@ -37,7 +41,9 @@ export function normalizeGitRepoToInsert(
     sourceId,
     name: repo.name,
     fullName: repo.fullName,
-    normalizedFullName: repo.fullName.toLowerCase(),
+    normalizedFullName: normalizedRepositoryName(repo.fullName, repo.repoType, repo.sourceProvider),
+    repoType: repo.repoType ?? 'model',
+    isGated: repo.isGated ?? false,
     url: repo.url,
     cloneUrl: repo.cloneUrl,
     owner: repo.owner,
@@ -67,7 +73,6 @@ export function normalizeGitRepoToInsert(
   };
 }
 
-// The source columns for an insert, defaulting to GitHub for legacy producers
 export function repositorySourceColumns(
   repo: Pick<GitRepo, 'sourceProvider' | 'sourceUrl'>
 ): Pick<RepoInsert, 'sourceProvider' | 'sourceUrl'> {
@@ -99,7 +104,7 @@ export function repositoryDestinationColumns(
  * name there. The repositories table is unique on (userId, sourceId,
  * normalizedFullName) so that the same owner/name can be tracked on two
  * hosts, but two source rows can point at the same host (a personal token
- * source and a public-only source, both github.com), and a legacy row with a
+ * source and a public-only source, both huggingface.co), and a legacy row with a
  * NULL sourceId is distinct from a re-imported one. Discovery used the unique
  * index alone to decide what was new, so one upstream repository could end up
  * as two rows that both mirror to the same destination repository and get
@@ -112,8 +117,8 @@ export interface RepositoryIdentityFields {
 }
 
 export function repositoryIdentityKey(row: RepositoryIdentityFields): string {
-  const provider = (row.sourceProvider || 'github').trim().toLowerCase();
-  const url = (row.sourceUrl || 'https://github.com').trim().toLowerCase().replace(/\/+$/, '');
+  const provider = (row.sourceProvider || 'huggingface').trim().toLowerCase();
+  const url = (row.sourceUrl || 'https://huggingface.co').trim().toLowerCase().replace(/\/+$/, '');
   return `${provider}|${url}|${row.normalizedFullName.toLowerCase()}`;
 }
 

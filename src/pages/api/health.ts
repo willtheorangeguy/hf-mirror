@@ -2,9 +2,7 @@ import type { APIRoute } from "astro";
 import { jsonResponse, createSecureErrorResponse } from "@/lib/utils";
 import { db } from "@/lib/db";
 import { getRecoveryStatus, hasJobsNeedingRecovery } from "@/lib/recovery";
-import { httpGet } from "@/lib/http-client";
 
-// Cache for the latest version to avoid frequent GitHub API calls
 interface VersionCache {
   latestVersion: string;
   timestamp: number;
@@ -19,7 +17,7 @@ export const GET: APIRoute = async () => {
     const dbStatus = await checkDatabaseConnection();
 
     // Get current and latest versions
-    const currentVersion = process.env.npm_package_version || "unknown";
+    const currentVersion = process.env.npm_package_version || "0.1.0";
     const latestVersion = await checkLatestVersion();
 
     // Get recovery system status
@@ -112,7 +110,7 @@ async function getRecoverySystemStatus() {
 
 /**
  * Compare semantic versions
- * Returns: 
+ * Returns:
  *  -1 if v1 < v2
  *   0 if v1 = v2
  *   1 if v1 > v2
@@ -120,48 +118,20 @@ async function getRecoverySystemStatus() {
 function compareVersions(v1: string, v2: string): number {
   const parts1 = v1.split('.').map(Number);
   const parts2 = v2.split('.').map(Number);
-  
+
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
     const part1 = parts1[i] || 0;
     const part2 = parts2[i] || 0;
-    
+
     if (part1 < part2) return -1;
     if (part1 > part2) return 1;
   }
-  
+
   return 0;
 }
 
-/**
- * Check for the latest version from GitHub releases
- */
 async function checkLatestVersion(): Promise<string> {
-  // Return cached version if available and not expired
-  if (versionCache && (Date.now() - versionCache.timestamp) < CACHE_TTL) {
-    return versionCache.latestVersion;
-  }
-
-  try {
-    // Fetch the latest release from GitHub
-    const response = await httpGet(
-      'https://api.github.com/repos/RayLabsHQ/gitea-mirror/releases/latest',
-      { 'Accept': 'application/vnd.github.v3+json' }
-    );
-
-    // Extract version from tag_name (remove 'v' prefix if present)
-    const latestVersion = response.data.tag_name.replace(/^v/, '');
-
-    // Update cache
-    versionCache = {
-      latestVersion,
-      timestamp: Date.now()
-    };
-
-    return latestVersion;
-  } catch (error) {
-    console.error('Failed to check for latest version:', error);
-    return 'unknown';
-  }
+  return process.env.npm_package_version || "0.1.0";
 }
 
 // Import sql tag for raw SQL queries

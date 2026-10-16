@@ -19,14 +19,14 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Database path - ensure we use absolute path
-const dbPath = path.join(dataDir, "gitea-mirror.db");
+const dbPath = path.join(dataDir, "hf-mirror.db");
 
 /**
  * Initialize database with migrations
  */
 async function initDatabase() {
   console.log("📦 Initializing database...");
-  
+
   // Create an empty database file if it doesn't exist
   if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, "");
@@ -55,7 +55,7 @@ async function initDatabase() {
  */
 async function checkDatabase() {
   console.log("🔍 Checking database status...");
-  
+
   if (!fs.existsSync(dbPath)) {
     console.log("❌ Database does not exist at:", dbPath);
     console.log("💡 Run 'bun run init-db' to create the database");
@@ -104,7 +104,7 @@ async function checkDatabase() {
  */
 async function resetUsers() {
   console.log("🗑️  Resetting all user accounts...");
-  
+
   if (!fs.existsSync(dbPath)) {
     console.log("❌ Database does not exist");
     process.exit(1);
@@ -123,7 +123,7 @@ async function resetUsers() {
     await db.delete(users);
 
     console.log("✅ All user accounts and related data have been removed");
-    
+
     sqlite.close();
   } catch (error) {
     console.error("❌ Error resetting users:", error);
@@ -137,12 +137,12 @@ async function resetUsers() {
  */
 async function cleanupDatabase() {
   console.log("🧹 Cleaning up database files...");
-  
+
   const filesToRemove = [
     dbPath,
-    path.join(dataDir, "gitea-mirror-dev.db"),
-    path.join(process.cwd(), "gitea-mirror.db"),
-    path.join(process.cwd(), "gitea-mirror-dev.db"),
+    path.join(dataDir, "hf-mirror-dev.db"),
+    path.join(process.cwd(), "hf-mirror.db"),
+    path.join(process.cwd(), "hf-mirror-dev.db"),
   ];
 
   for (const file of filesToRemove) {
@@ -160,11 +160,11 @@ async function cleanupDatabase() {
  */
 async function fixDatabase() {
   console.log("🔧 Fixing database location issues...");
-  
+
   // Legacy database paths
-  const rootDbFile = path.join(process.cwd(), "gitea-mirror.db");
-  const rootDevDbFile = path.join(process.cwd(), "gitea-mirror-dev.db");
-  const dataDevDbFile = path.join(dataDir, "gitea-mirror-dev.db");
+  const rootDbFile = path.join(process.cwd(), "hf-mirror.db");
+  const rootDevDbFile = path.join(process.cwd(), "hf-mirror-dev.db");
+  const dataDevDbFile = path.join(dataDir, "hf-mirror-dev.db");
 
   // Check for databases in wrong locations
   if (fs.existsSync(rootDbFile)) {

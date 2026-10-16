@@ -40,7 +40,7 @@ describe("filterSourceRepositories", () => {
 
   test("skipForks drops forks", () => {
     const kept = filterSourceRepositories(all, {
-      config: { githubConfig: { skipForks: true } as any },
+      config: { sourceConfig: { skipForks: true } as any },
       username: "me",
     });
     expect(kept.map((r) => r.name)).not.toContain("forked");
@@ -49,7 +49,7 @@ describe("filterSourceRepositories", () => {
 
   test("skipPersonalRepos drops the configured account's own repos, not org repos", () => {
     const kept = filterSourceRepositories(all, {
-      config: { githubConfig: { skipPersonalRepos: true } as any },
+      config: { sourceConfig: { skipPersonalRepos: true } as any },
       username: "ME",
     });
     expect(kept.map((r) => r.name).sort()).toEqual(["app", "shared", "tool"]);
@@ -57,7 +57,7 @@ describe("filterSourceRepositories", () => {
 
   test("includeCollaboratorRepos=false drops other users' personal repos only", () => {
     const kept = filterSourceRepositories(all, {
-      config: { githubConfig: { includeCollaboratorRepos: false } as any },
+      config: { sourceConfig: { includeCollaboratorRepos: false } as any },
       username: "me",
     });
     expect(kept.map((r) => r.name)).not.toContain("shared");
@@ -67,7 +67,7 @@ describe("filterSourceRepositories", () => {
 
   test("the collaborator override wins over the config", () => {
     const kept = filterSourceRepositories(all, {
-      config: { githubConfig: { includeCollaboratorRepos: false } as any },
+      config: { sourceConfig: { includeCollaboratorRepos: false } as any },
       options: { includeCollaboratorReposOverride: true },
       username: "me",
     });
@@ -76,7 +76,7 @@ describe("filterSourceRepositories", () => {
 
   test("an organization allowlist keeps only listed org repos and leaves personal repos alone", () => {
     const kept = filterSourceRepositories(all, {
-      config: { githubConfig: { includeOrganizations: [" Acme "] } as any },
+      config: { sourceConfig: { includeOrganizations: [" Acme "] } as any },
       username: "me",
     });
     expect(kept.map((r) => r.name).sort()).toEqual(["forked", "mine", "shared", "tool"]);
@@ -84,7 +84,7 @@ describe("filterSourceRepositories", () => {
 
   test("includeAllOrgsOverride ignores the allowlist", () => {
     const kept = filterSourceRepositories(all, {
-      config: { githubConfig: { includeOrganizations: ["acme"] } as any },
+      config: { sourceConfig: { includeOrganizations: ["acme"] } as any },
       options: { includeAllOrgsOverride: true },
       username: "me",
     });
@@ -108,7 +108,7 @@ describe("filterSourceRepositories - per-organization fork pins", () => {
 
   test("a false pin keeps that org's forks when the global switch skips forks", () => {
     const kept = filterSourceRepositories(repos, {
-      config: { githubConfig: { skipForks: true } as any },
+      config: { sourceConfig: { skipForks: true } as any },
       options: { orgForkOverrides: new Map([["globex", false]]) },
       username: "me",
     });

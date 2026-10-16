@@ -17,7 +17,7 @@ function getEncryptionKey(): Buffer {
   }
   
   // Use a static salt derived from the secret for consistent key generation
-  // This ensures the same key is generated across application restarts
+  // Preserve the original salt so existing encrypted HF tokens remain readable.
   const salt = crypto.createHash('sha256').update('gitea-mirror-salt' + secret).digest();
   
   return crypto.pbkdf2Sync(secret, salt, ITERATIONS, KEY_LENGTH, 'sha256');

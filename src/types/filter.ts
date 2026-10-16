@@ -2,6 +2,7 @@ import type { MembershipRole } from "./organizations";
 import type { RepoStatus } from "./Repository";
 
 export interface FilterParams {
+  repoType?: "model" | "dataset" | "space" | "";
   searchTerm?: string;
   status?: RepoStatus | ""; // repos, activity   and orgs status
   membershipRole?: MembershipRole | ""; //membership role in orgs

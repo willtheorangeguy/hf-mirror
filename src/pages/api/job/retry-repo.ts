@@ -1,21 +1,14 @@
+import { repositorySchema } from "@/lib/db/schema";
 import type { APIRoute } from "astro";
-import type { SourceRecord } from "@/lib/sources";
-import {
-  decryptSourceToken,
-  findSourceForRepository,
-  listSources,
-  resolveGitHubApiBaseUrl,
-} from "@/lib/sources";
+
 import { db, configs, repositories } from "@/lib/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { getGiteaRepoOwnerAsync, isRepoPresentInGitea } from "@/lib/gitea";
-import { mirrorRepositoryToDestination, syncRepositoryOnDestination } from "@/lib/mirror-dispatch";
-import { usesPushEngine } from "@/lib/destination-connection";
-import { createGitHubClient, createPublicGitHubClient } from "@/lib/github";
-import { repoStatusEnum, repositoryVisibilityEnum } from "@/types/Repository";
-import type { RetryRepoRequest, RetryRepoResponse } from "@/types/retry";
+
+import { mirrorRepositoryToDestination } from "@/lib/mirror-dispatch";
+
+import type { RetryRepoRequest } from "@/types/retry";
 import { processWithRetry } from "@/lib/utils/concurrency";
-import { createMirrorJob } from "@/lib/helpers";
+
 import { createSecureErrorResponse } from "@/lib/utils";
 import { requireAuthenticatedUserId } from "@/lib/auth-guards";
 
@@ -84,159 +77,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     }
 
-    // Start background retry with parallel processing
     setTimeout(async () => {
-      // Only GitHub sources need an API client while mirroring (metadata).
-      // Other hosts get code-only mirrors through Gitea. The retried
-      // repositories can come from different sources, so the client is
-      // built per repository from its own source.
-      const sources = await listSources(userId);
-      const octokitForSource = (source: SourceRecord | null) => {
-        if (!source || source.provider !== "github") return null;
-        const token = decryptSourceToken(source.token);
-        // A tokenless GitHub source still gets an anonymous public client
-        // (60 req/hr) so public-repo metadata mirrors; an empty token must
-        // never reach createGitHubClient, which would send `auth: ""`.
-        return token
-          ? createGitHubClient(
-              token,
-              userId,
-              source.username || undefined,
-              resolveGitHubApiBaseUrl(source.url)
-            )
-          : createPublicGitHubClient(resolveGitHubApiBaseUrl(source.url));
-      };
-
-      // Define the concurrency limit - adjust based on API rate limits
-      const CONCURRENCY_LIMIT = 3;
-
-      // Process repositories in parallel with retry capability
-      await processWithRetry(
-        repos,
-        async (repo) => {
-          // Prepare repository data
-          const visibility = repositoryVisibilityEnum.parse(repo.visibility);
-          const status = repoStatusEnum.parse(repo.status);
-          const repoData = {
-            ...repo,
-            visibility,
-            status,
-            organization: repo.organization ?? undefined,
-            lastMirrored: repo.lastMirrored ?? undefined,
-            errorMessage: repo.errorMessage ?? undefined,
-            forkedFrom: repo.forkedFrom ?? undefined,
-            mirroredLocation: repo.mirroredLocation || "",
-          };
-
-          const repoSource = findSourceForRepository(repo, sources);
-          const octokit = octokitForSource(repoSource);
-
-          // Log the start of retry operation
-          console.log(`Starting retry for repository: ${repo.name}`);
-
-          // Create a mirror job entry to track progress
-          await createMirrorJob({
-            userId: config.userId || "",
-            repositoryId: repo.id,
-            repositoryName: repo.name,
-            message: `Started retry operation for repository: ${repo.name}`,
-            details: `Repository ${repo.name} is now in the retry queue.`,
-            status: "imported",
-          });
-
-          if (usesPushEngine(config)) {
-            // A push target: the engine clones or fetches, then pushes, and
-            // creates the target repository itself when it is missing.
-            await mirrorRepositoryToDestination({ config, octokit, repository: repoData });
-            console.log(`Pushed repo: ${repo.name}`);
-            return repo;
-          }
-
-          // Determine if the repository exists in Gitea (with organization overrides)
-          let owner = await getGiteaRepoOwnerAsync({
-            config,
-            repository: repoData,
-            sourceUsername: repoSource?.username,
-          });
-
-          const present = await isRepoPresentInGitea({
-            config,
-            owner,
-            repoName: repo.name,
-          });
-
-          if (present) {
-            // If the repository exists, sync it
-            await syncRepositoryOnDestination({ config, repository: repoData });
-            console.log(`Synced existing repo: ${repo.name}`);
-          } else {
-            // If the repository doesn't exist, mirror it. GitHub sources
-            // pass their own client (anonymous for tokenless public ones);
-            // other hosts mirror code-only with a null client.
-            console.log(`Importing repo: ${repo.name} to owner: ${owner}`);
-
-            // For single-org strategy, or when mirroring to an org,
-            // use the org mirroring function to ensure proper organization handling
-            const mirrorStrategy = config.githubConfig?.mirrorStrategy || 
-              (config.giteaConfig?.preserveOrgStructure ? "preserve" : "flat-user");
-            
-            const shouldUseOrgMirror = 
-              owner !== config.giteaConfig?.defaultOwner || // Different owner means org
-              mirrorStrategy === "single-org"; // Single-org strategy always uses org
-
-            await mirrorRepositoryToDestination({
-              config,
-              octokit,
-              repository: {
-                ...repoData,
-                status: repoStatusEnum.parse("imported"),
-              },
-              orgName: shouldUseOrgMirror ? owner : undefined,
-            });
-          }
-
-          return repo;
-        },
-        {
-          concurrencyLimit: CONCURRENCY_LIMIT,
-          maxRetries: 2,
-          retryDelay: 2000,
-          onProgress: (completed, total, result) => {
-            const percentComplete = Math.round((completed / total) * 100);
-            console.log(`Retry progress: ${percentComplete}% (${completed}/${total})`);
-
-            if (result) {
-              console.log(`Successfully processed repository: ${result.name}`);
-            }
-          },
-          onRetry: (repo, error, attempt) => {
-            console.log(`Retrying repository ${repo.name} (attempt ${attempt}): ${error.message}`);
-          }
-        }
-      );
-
-      console.log("All repository retry tasks completed");
+      await processWithRetry(repos, async (repo) => {
+        await mirrorRepositoryToDestination({ config, repository: repositorySchema.parse({ ...repo, mirroredLocation: repo.mirroredLocation ?? "" }) });
+        return repo;
+      }, { concurrencyLimit: 3, maxRetries: 2, retryDelay: 2000 });
     }, 0);
-
-    const responsePayload: RetryRepoResponse = {
-      success: true,
-      message: "Retry job (sync/mirror) started.",
-      repositories: repos.map((repo) => ({
-        ...repo,
-        status: repoStatusEnum.parse(repo.status),
-        organization: repo.organization ?? undefined,
-        lastMirrored: repo.lastMirrored ?? undefined,
-        errorMessage: repo.errorMessage ?? undefined,
-        forkedFrom: repo.forkedFrom ?? undefined,
-        visibility: repositoryVisibilityEnum.parse(repo.visibility),
-      })),
-    };
-
-    return new Response(JSON.stringify(responsePayload), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    return createSecureErrorResponse(err, "repository retry", 500);
+    return Response.json({ success: true, message: "Retry job started", repositories: repos });
+  } catch (error) {
+    return createSecureErrorResponse(error, "repository retry", 500);
   }
 };

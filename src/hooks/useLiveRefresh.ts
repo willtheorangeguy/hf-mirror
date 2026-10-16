@@ -12,7 +12,7 @@ interface LiveRefreshContextType {
 const LiveRefreshContext = createContext<LiveRefreshContextType | undefined>(undefined);
 
 const LIVE_REFRESH_INTERVAL = 3000; // 3 seconds
-const SESSION_STORAGE_KEY = 'gitea-mirror-live-refresh';
+const SESSION_STORAGE_KEY = 'hf-mirror-live-refresh';
 
 export function LiveRefreshProvider({ children }: { children: React.ReactNode }) {
   const [isLiveEnabled, setIsLiveEnabled] = useState<boolean>(false);

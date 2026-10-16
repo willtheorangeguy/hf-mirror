@@ -6,12 +6,9 @@ export type StarredReposMode = "dedicated-org" | "preserve-owner";
 export type BackupStrategy = "disabled" | "always" | "on-force-push" | "block-on-force-push";
 export type ScheduleMode = "interval" | "clock";
 /** Which host repositories are pulled from. "gitea" also covers Forgejo. */
-export type SourceProvider = "github" | "gitlab" | "gitea";
-/**
- * Which host repositories are mirrored into. Gitea and Forgejo are pull
- * mirrors; GitHub and GitLab are push targets served by the push engine.
- */
-export type DestinationProvider = "gitea" | "forgejo" | "github" | "gitlab";
+export type SourceProvider = "huggingface";
+
+export type DestinationProvider = "gitea" | "forgejo";
 
 export interface GiteaConfig {
   /** Defaults to "gitea" when absent. */
@@ -52,24 +49,19 @@ export interface ScheduleConfig {
 
 export interface DatabaseCleanupConfig {
   enabled: boolean;
-  retentionDays: number; // Actually stores seconds, but keeping the name for compatibility
-  deleteIfNotInGitHub: boolean;
-  orphanedRepoAction: "skip" | "archive" | "delete";
-  dryRun: boolean;
-  deleteFromGitea?: boolean;
-  protectedRepos?: string[];
-  batchSize?: number;
-  pauseBetweenDeletes?: number;
+  retentionDays: number; // Retention duration in seconds.
   lastRun?: Date;
   nextRun?: Date;
 }
 
 export type DuplicateNameStrategy = "suffix" | "prefix" | "owner-org";
 
-export interface GitHubConfig {
-  /** Defaults to "github" when absent. */
+export interface HFSourceConfig {
+  repoTypes?: ("model" | "dataset" | "space")[];
+  collections?: string[];
+  /** Defaults to "huggingface" when absent. */
   provider?: SourceProvider;
-  /** Instance base URL for GitLab and Gitea sources. */
+
   url?: string;
   username: string;
   token: string;
@@ -137,7 +129,7 @@ export interface SourceApiRecord {
 
 export interface SaveConfigApiRequest {
   userId: string;
-  githubConfig: GitHubConfig;
+  sourceConfig: HFSourceConfig;
   giteaConfig: GiteaConfig;
   scheduleConfig: ScheduleConfig;
   cleanupConfig: DatabaseCleanupConfig;
@@ -202,7 +194,7 @@ export interface ConfigApiResponse {
   userId: string;
   name: string;
   isActive: boolean;
-  githubConfig: GitHubConfig;
+  sourceConfig: HFSourceConfig;
   giteaConfig: GiteaConfig;
   scheduleConfig: ScheduleConfig;
   cleanupConfig: DatabaseCleanupConfig;

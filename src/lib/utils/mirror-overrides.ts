@@ -5,7 +5,6 @@ import {
   normalizeSourceProviderKind,
   sourceKindSupportsReleases,
 } from "@/lib/source-providers/kinds";
-import { isPushDestinationKind, normalizeDestinationProviderKind } from "@/lib/destination-kinds";
 
 /**
  * The mirror option flags that can be overridden per organization and per
@@ -44,7 +43,7 @@ export type MirrorOverrideLimitKey = (typeof MIRROR_OVERRIDE_LIMIT_KEYS)[number]
  * contains. They are kept apart from `MIRROR_OVERRIDE_KEYS` because that list
  * mirrors `giteaConfigSchema` flag names so the resolver can read the global
  * tier with the same key — the global tier for these lives on
- * `githubConfig` instead, and they are meaningless at the repository tier.
+ * `sourceConfig` instead, and they are meaningless at the repository tier.
  */
 export const ORG_SELECTION_OVERRIDE_KEYS = ["skipForks"] as const;
 
@@ -74,12 +73,6 @@ export type InheritedMirrorOptions = Partial<Record<MirrorOverrideKey, boolean>>
   skipForks?: boolean;
 };
 
-/**
- * Sanitize a release limit from any tier into a positive integer, or
- * `undefined` when the value is absent or unusable (so the next tier out is
- * consulted). Floors fractional input rather than rejecting it, matching what
- * `mirrorGitHubReleasesToGitea` has always done with the global value.
- */
 export function normalizeReleaseLimit(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
   const limit = Math.floor(value);
@@ -139,94 +132,14 @@ export const STARRED_CLAMPED_KEYS = [
   "mirrorMilestones",
 ] as const satisfies readonly MirrorOverrideKey[];
 
-/**
- * Flags that only work for GitHub sources.
- *
- * Issue, pull request, label and milestone mirroring read the GitHub API. A
- * repository from GitLab or Gitea gets code, wiki and LFS through the Gitea
- * pull mirror, so the resolver forces these off for it regardless of what any
- * tier asked for.
- *
- * `mirrorReleases` is deliberately not in this list since #440: releases are
- * gated on `sourceKindSupportsReleases` instead, which also allows Gitea and
- * Forgejo sources. GitLab still ends up with releases off, through that gate.
- */
-export const GITHUB_ONLY_METADATA_KEYS = [
-  "mirrorMetadata",
-  "mirrorIssues",
-  "mirrorPullRequests",
-  "mirrorLabels",
-  "mirrorMilestones",
-] as const satisfies readonly MirrorOverrideKey[];
-
-/**
- * Flags that cannot take effect on a push target.
- *
- * GitHub and GitLab destinations receive `git push` of branches and tags
- * and nothing else: no wiki clone, no LFS transfer, no issues, releases,
- * labels or milestones. The resolver forces all of these off for them.
- */
-export const PUSH_TARGET_CLAMPED_KEYS = [
-  "lfs",
-  "wiki",
-  "mirrorReleases",
-  "mirrorMetadata",
-  "mirrorIssues",
-  "mirrorPullRequests",
-  "mirrorLabels",
-  "mirrorMilestones",
-] as const satisfies readonly MirrorOverrideKey[];
-
 /** True when a config's destination is served by the push engine. */
-export function isPushDestinationConfig(config: { giteaConfig?: { provider?: unknown } | null } | null | undefined): boolean {
-  return isPushDestinationKind(normalizeDestinationProviderKind(config?.giteaConfig?.provider));
-}
 
-/**
- * Flags surfaced in the override UI.
- *
- * `mirrorMetadata` is intentionally excluded. It is a write-time master switch
- * in the global settings UI (config-mapper ANDs it into the individual flags
- * when the config is saved) and is never read by the mirror paths in gitea.ts
- * or gitea-enhanced.ts. A per-object override for it would resolve correctly
- * and then change nothing, which is exactly the silent no-op this UI is meant
- * to avoid.
- */
 export const UI_MIRROR_OVERRIDE_KEYS: MirrorOverrideKey[] = [
   "lfs",
-  "wiki",
   "mirrorIssues",
   "mirrorPullRequests",
-  "mirrorReleases",
-  "mirrorLabels",
-  "mirrorMilestones",
 ];
 
-/**
- * Convert the API's `mirrorOptions` shape into the flag keys used everywhere
- * else.
- *
- * `/api/config` does not return the mirror flags on `giteaConfig`. On the way
- * out, `mapDbToUiConfig` reshapes them into `mirrorOptions`, which uses
- * different names (`mirrorLFS`, not `lfs`) and nests the metadata flags under
- * `metadataComponents` with short names (`issues`, not `mirrorIssues`). Client
- * code reading `giteaConfig.lfs` therefore gets `undefined`, not `false`, which
- * is indistinguishable from "off" once coerced.
- *
- * The mapping is 1:1 with the fields the runtime reads. `metadataComponents.*`
- * carries the raw stored values (`issues` is `giteaConfig.mirrorIssues`
- * untouched), so passing them straight through reproduces exactly what
- * gitea.ts and gitea-enhanced.ts will do.
- *
- * Deliberately does NOT AND the components with `mirrorMetadata`. That switch
- * is a write-path concern: `mapUiToDbConfig` already applies it when
- * persisting, so a config saved through the settings UI has it baked into the
- * stored flag. Applying it again on read double-applies it. That is invisible
- * while the stored state is self-consistent, and wrong when it is not, which
- * is reachable via env vars: MIRROR_METADATA=false with MIRROR_ISSUES=true
- * stores `mirrorMetadata:false, mirrorIssues:true`, and the runtime mirrors
- * issues. A second AND here would report "off" for something that is on.
- */
 export function mirrorOptionsToFlags(
   mirrorOptions:
     | {
@@ -270,7 +183,6 @@ export const MIRROR_GATING_REASONS = {
     "Starred repos mirror code only (Advanced Options > starred code only)",
   labelsFollowIssues: "Issues mirroring already syncs labels",
   releasesOff: "Releases are not being mirrored",
-  pushTarget: "Not available for GitHub and GitLab destinations: only branches and tags are pushed",
 } as const;
 
 /** key -> reason it cannot take effect. Absent key means editable. */
@@ -281,25 +193,6 @@ export type MirrorOverrideGating = Partial<
   >
 >;
 
-/**
- * Decide which toggles cannot take effect, and why.
- *
- * This is the single source of truth behind the rule that a toggle which
- * cannot take effect is disabled with a reason rather than silently ignored.
- * It mirrors the real runtime behavior:
- *
- *  - the starred clamp in `resolveMirrorOptions` forces STARRED_CLAMPED_KEYS
- *    off for starred repos when starredCodeOnly is set, outranking any override
- *  - `shouldMirrorLabels` in gitea.ts / gitea-enhanced.ts is
- *    `mirrorLabels && !mirrorIssues`, so labels cannot take effect while issues
- *    are being mirrored (the issue path already reconciles labels)
- *  - `releaseLimit` and `releaseAssetLimit` are only read inside the release
- *    mirror, so they cannot take effect while `mirrorReleases` resolves to off
- *
- * `effective` is the value each flag currently resolves to including the
- * in-progress edit, so the labels and release-limit gates react live as
- * issues / releases are toggled.
- */
 export function getMirrorOverrideGating({
   targetKind,
   isStarred,
@@ -317,14 +210,7 @@ export function getMirrorOverrideGating({
   const gating: MirrorOverrideGating = {};
 
   // A push target gets branches and tags only, whatever any tier asks for.
-  if (isPushDestinationKind(normalizeDestinationProviderKind(destinationProvider))) {
-    for (const key of PUSH_TARGET_CLAMPED_KEYS) {
-      gating[key] = MIRROR_GATING_REASONS.pushTarget;
-    }
-    gating.releaseLimit = MIRROR_GATING_REASONS.pushTarget;
-    gating.releaseAssetLimit = MIRROR_GATING_REASONS.pushTarget;
-    return gating;
-  }
+
 
   // Organizations are never starred, so the clamp cannot apply to them.
   const starredClampApplies =
@@ -524,7 +410,7 @@ export function resolveMirrorOptions({
   // clamp intentionally outranks explicit per-repo overrides: the setting
   // exists to stop starred repos from dragging in metadata wholesale.
   const skipMetadataForStarred =
-    !!repository.isStarred && !!config.githubConfig?.starredCodeOnly;
+    !!repository.isStarred && !!config.sourceConfig?.starredCodeOnly;
 
   if (skipMetadataForStarred) {
     // STARRED_CLAMPED_KEYS is shared with getMirrorOverrideGating so the set of
@@ -535,27 +421,15 @@ export function resolveMirrorOptions({
     }
   }
 
-  // Metadata mirroring needs the GitHub API. Rows without a source
-  // provider predate the column and came from GitHub.
   const sourceKind = normalizeSourceProviderKind(repository.sourceProvider);
-  if (sourceKind !== "github") {
-    for (const key of GITHUB_ONLY_METADATA_KEYS) {
-      resolved[key] = false;
-    }
-  }
+  resolved.wiki = false; resolved.mirrorLabels = false; resolved.mirrorMilestones = false;
 
-  // Releases are listed through the source API, which GitHub and
-  // Gitea/Forgejo both expose (#440). GitLab is code only, so it lands here.
   if (!sourceKindSupportsReleases(sourceKind)) {
     resolved.mirrorReleases = false;
   }
 
   // A push target receives branches and tags only.
-  if (isPushDestinationConfig(config)) {
-    for (const key of PUSH_TARGET_CLAMPED_KEYS) {
-      resolved[key] = false;
-    }
-  }
+
 
   return resolved;
 }
@@ -563,7 +437,7 @@ export function resolveMirrorOptions({
 /**
  * Resolve the fork policy for one organization.
  *
- * Precedence: organization override -> global `githubConfig.skipForks` ->
+ * Precedence: organization override -> global `sourceConfig.skipForks` ->
  * false. An organization pinning `false` keeps its forks even when the
  * global switch skips forks everywhere else, and vice versa.
  */
@@ -576,7 +450,7 @@ export function resolveOrganizationSkipForks({
 }): boolean {
   const org = parseMirrorOverrides(orgOverrides);
   if (typeof org?.skipForks === "boolean") return org.skipForks;
-  return config.githubConfig?.skipForks ?? false;
+  return config.sourceConfig?.skipForks ?? false;
 }
 
 /**
@@ -590,7 +464,7 @@ export function orgForkSkipDecision(
   orgForkOverrides: Map<string, boolean> | undefined,
   config: Partial<Config>
 ): (organizationName: string | null | undefined) => boolean {
-  const globalSkipForks = config.githubConfig?.skipForks ?? false;
+  const globalSkipForks = config.sourceConfig?.skipForks ?? false;
   return (organizationName) => {
     const key = (organizationName ?? "").trim().toLowerCase();
     if (key && orgForkOverrides?.has(key)) return orgForkOverrides.get(key)!;

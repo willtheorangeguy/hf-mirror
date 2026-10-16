@@ -89,9 +89,9 @@ mock.module("@/lib/utils/config-encryption", () => {
       // Return the config as-is for tests
       return config;
     },
-    getDecryptedGitHubToken: (config: any) => {
+    getDecryptedSourceToken: (config: any) => {
       // Return the token as-is for tests
-      return config.githubConfig?.token || "";
+      return config.sourceConfig?.token || "";
     },
     getDecryptedGiteaToken: (config: any) => {
       // Return the token as-is for tests
@@ -104,7 +104,7 @@ mock.module("@/lib/utils/config-encryption", () => {
 mock.module("@/lib/helpers", () => {
   const mockCreateMirrorJob = mock(() => Promise.resolve("mock-job-id"));
   const mockCreateEvent = mock(() => Promise.resolve());
-  
+
   return {
     createMirrorJob: mockCreateMirrorJob,
     createEvent: mockCreateEvent,

@@ -5,20 +5,13 @@
 
 import { findInterruptedJobs, resumeInterruptedJob } from './helpers';
 import { resetStuckMirrorStatuses } from './stuck-status-recovery';
-import { db, repositories, organizations, mirrorJobs, configs } from './db';
+import { db, repositories, mirrorJobs, configs } from "./db";
 import { eq, and, lt, inArray, sql } from 'drizzle-orm';
 import { mirrorRepositoryToDestination, syncRepositoryOnDestination } from './mirror-dispatch';
-import { createGitHubClient, createPublicGitHubClient } from './github';
-import type { Octokit } from '@octokit/rest';
-import {
-  decryptSourceToken,
-  findSourceForRepository,
-  listSources,
-  resolveGitHubApiBaseUrl,
-} from './sources';
+
+import { findSourceForRepository, listSources } from "./sources";
 import { processWithResilience } from './utils/concurrency';
 import { repositoryVisibilityEnum, repoStatusEnum } from '@/types/Repository';
-import type { Repository } from './db/schema';
 
 // Recovery state tracking
 let recoveryInProgress = false;
@@ -274,7 +267,7 @@ async function recoverMirrorJob(job: any, remainingItemIds: string[]) {
 
     // No source-token check here: the client is resolved from each
     // repository's own source below, and a public-only source has none.
-    // Only GitHub sources use an API client while mirroring (metadata).
+
     // Other hosts get code-only mirrors through Gitea, so no client is built.
     // Repositories picked by bare id can span sources, so the sources are
     // loaded once here and the client is resolved per repository below.
@@ -296,30 +289,12 @@ async function recoverMirrorJob(job: any, remainingItemIds: string[]) {
           mirroredLocation: repo.mirroredLocation || "",
         };
 
-        let octokit: Octokit | null = null;
+
         const repoSource = findSourceForRepository(repo, sources);
-        if (repoSource?.provider === 'github') {
-          try {
-            const decryptedToken = decryptSourceToken(repoSource.token);
-            // A tokenless GitHub source gets the anonymous public client
-            // (60 req/hr), the same resolution the job routes use; an empty
-            // token must never reach createGitHubClient, which would send
-            // `auth: ""` and 401 on every call.
-            octokit = decryptedToken
-              ? createGitHubClient(
-                  decryptedToken,
-                  config.userId || undefined,
-                  repoSource.username || undefined,
-                  resolveGitHubApiBaseUrl(repoSource.url)
-                )
-              : createPublicGitHubClient(resolveGitHubApiBaseUrl(repoSource.url));
-          } catch (error) {
-            throw new Error(`Failed to create GitHub client: ${error instanceof Error ? error.message : String(error)}`);
-          }
-        }
+
 
         await mirrorRepositoryToDestination({
-          octokit,
+
           repository: repoData,
           config,
         });

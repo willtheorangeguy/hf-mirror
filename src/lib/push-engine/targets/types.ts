@@ -30,7 +30,7 @@ export interface EnsureRepositoryInput {
 export interface PushTargetIdentity {
   /** The login the token belongs to. */
   login: string;
-  /** Human readable, e.g. "GitHub Enterprise 3.12" or "GitLab 17.4". */
+
   label?: string;
 }
 
@@ -46,8 +46,8 @@ export class PushTargetError extends Error {
 }
 
 export interface PushTarget {
-  readonly kind: "github" | "gitlab" | "local";
-  /** Base URL of the host, e.g. https://github.com. */
+  readonly kind: "gitea" | "local";
+  /** Base URL of the destination host. */
   readonly baseUrl: string;
   /** Credentials for the push. Null for targets that need none (local files). */
   pushCredentials(): GitCredentials | null;

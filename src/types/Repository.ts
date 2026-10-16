@@ -50,7 +50,11 @@ export type RepositoryApiResponse =
   | RepositoryApiSuccessResponse
   | RepositoryApiErrorResponse;
 
+export type HFRepoType = "model" | "dataset" | "space";
+
 export interface GitRepo {
+  repoType?: HFRepoType;
+  isGated?: boolean;
   name: string;
   fullName: string;
   url: string;
@@ -59,7 +63,7 @@ export interface GitRepo {
   owner: string;
   organization?: string;
   mirroredLocation?: string;
-  /** Host the repository came from. Absent means GitHub. */
+
   sourceProvider?: SourceProviderKind;
   sourceUrl?: string;
   /** Source row this repository belongs to; dangling (or null) after the source was removed. */
@@ -101,6 +105,8 @@ export interface AddRepositoriesApiRequest {
   destinationOrg?: string;
   /** Host of the pasted URL, when one was pasted. Must match the configured source. */
   host?: string;
+  repoType?: HFRepoType;
+  sourceId?: string;
   /** Path segments of the pasted URL, resolved per source on the server. */
   path?: string[];
 }

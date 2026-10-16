@@ -1,15 +1,22 @@
 /**
  * The database aware side of the push engine.
  *
- * Mirrors the statuses, mirror jobs and activity rows the Gitea path
- * writes, so the dashboard, recovery and cleanup see a push target exactly
- * like a pull mirror. The git work itself lives in engine.ts.
+ * Records HF transfers in the statuses, jobs and activity rows used by the
+ * dashboard, recovery and cleanup. The Git work lives in engine.ts.
  */
+import { HuggingFaceSourceProvider } from "@/lib/source-providers/huggingface";
+import { currentGitSignal } from "./git";
+import { createHash } from "node:crypto";
+import path from "node:path";
+import { PendingApprovalError } from "./hf-transfer";
+import { resolveDataDir } from "./paths";
+import { resolveMirrorOptionsForRepository } from "@/lib/utils/mirror-overrides";
+import { archiveHFMetadata } from "@/lib/hf-metadata";
 import { eq } from "drizzle-orm";
 import { db, repositories } from "@/lib/db";
 import type { Config, Repository } from "@/lib/db/schema";
 import { createMirrorJob } from "@/lib/helpers";
-import { getGiteaRepoOwnerAsync } from "@/lib/gitea";
+import { getGiteaRepoOwnerAsync } from "@/lib/destination-api";
 import {
   assertRepositoryMatchesConnectedSource,
   sourceConnectionFromSource,
@@ -30,7 +37,22 @@ import {
 import { DESTINATION_PROVIDER_LABELS } from "@/lib/destination-kinds";
 import { repoStatusEnum } from "@/types/Repository";
 import { runPushMirror, type PushMirrorOutcome } from "./engine";
-import type { GitCredentials } from "./git";
+import { withGitCancellation, MirrorCancelledError, type GitCredentials } from "./git";
+
+const activeMirrors = new Map<string, { userId: string; controller: AbortController }>();
+export function cancelActiveMirror(id: string, userId: string): boolean {
+  const active = activeMirrors.get(id);
+  if (!active || active.userId !== userId) return false;
+  active.controller.abort(new MirrorCancelledError());
+  return true;
+}
+export async function pushMirrorRepository(input: PushMirrorRepositoryOptions): Promise<PushMirrorOutcome> {
+  if (activeMirrors.has(input.repository.id)) throw new Error("A mirror is already active for this repository");
+  const controller = new AbortController();
+  activeMirrors.set(input.repository.id, { userId: input.config.userId!, controller });
+  try { return await withGitCancellation(controller.signal, () => executePushMirrorRepository(input)); }
+  finally { activeMirrors.delete(input.repository.id); }
+}
 import { clonePathForRepository } from "./paths";
 import type { PushTarget } from "./targets/types";
 
@@ -41,6 +63,7 @@ export interface PushMirrorRepositoryOptions {
   repository: Repository;
   /** "mirror" for the first push, "sync" for later ones. Picks statuses and the job type. */
   mode?: PushMirrorMode;
+  approved?: boolean;
   /** Test hook: use this target instead of the one built from the config. */
   target?: PushTarget;
 }
@@ -78,7 +101,7 @@ export function resolveSourceCredentials(
 
 /** Private on the target unless the source repository is public and visibility is preserved. */
 export function resolveTargetPrivacy(config: Partial<Config>, repository: Repository): boolean {
-  if (repository.isPrivate || repository.visibility === "private" || repository.visibility === "internal") {
+  if (repository.isGated || repository.isPrivate || repository.visibility === "private" || repository.visibility === "internal") {
     return true;
   }
   const preserve = config.giteaConfig?.preserveVisibility ?? true;
@@ -86,11 +109,12 @@ export function resolveTargetPrivacy(config: Partial<Config>, repository: Reposi
   return config.giteaConfig?.visibility === "private";
 }
 
-export async function pushMirrorRepository({
+async function executePushMirrorRepository({
   config,
   repository,
   mode,
   target,
+  approved,
 }: PushMirrorRepositoryOptions): Promise<PushMirrorOutcome> {
   if (!config.userId || !config.giteaConfig?.url || !config.giteaConfig?.token) {
     throw new Error("A destination URL and token are required.");
@@ -112,8 +136,14 @@ export async function pushMirrorRepository({
 
   const recorded = parseMirroredLocation(repository.mirroredLocation);
   const effectiveMode: PushMirrorMode = mode ?? (recorded ? "sync" : "mirror");
-  const owner = recorded?.owner ?? (await getGiteaRepoOwnerAsync({ config, repository }));
-  const name = recorded?.name ?? repository.name;
+  const owner = recorded?.owner ?? (await getGiteaRepoOwnerAsync({ config, repository, sourceUsername: findSourceForRepository(repository, sources)?.username }));
+  const hf = repository.sourceProvider === "huggingface";
+  const rawName = recorded?.name ?? (hf ? `${repository.repoType}--${repository.owner}--${repository.name}` : repository.name);
+  const options = await resolveMirrorOptionsForRepository({ config, repository });
+  const identity = `${repository.sourceUrl}|${repository.repoType}|${repository.fullName}`;
+  const name = recorded?.name ?? (rawName.length <= 100 ? rawName : `${rawName.slice(0, 78)}--${createHash("sha256").update(identity).digest("hex").slice(0, 16)}`);
+  const archiveDirectory = path.join(resolveDataDir(), "archives", repository.id);
+  const marker = `[HF-mirror:${createHash("sha256").update(identity).digest("hex")}]`;
   const location = `${owner}/${name}`;
   const busyStatus = effectiveMode === "mirror" ? "mirroring" : "syncing";
   const doneStatus = effectiveMode === "mirror" ? "mirrored" : "synced";
@@ -144,7 +174,24 @@ export async function pushMirrorRepository({
     jobType,
   });
 
+  let gitComplete = false;
+  let progressWrites = Promise.resolve();
+  let lastProgressWrite = 0;
+  const reportProgress = (message: string) => {
+    console.info(`${logPrefix} ${message}`);
+    if (Date.now() - lastProgressWrite < 1000) return;
+    lastProgressWrite = Date.now();
+    progressWrites = progressWrites.then(async () => {
+      await db.update(repositories).set({ metadata: JSON.stringify({ hf: { git: gitComplete ? "complete" : "running", largeFiles: options.lfs ? "running" : "excluded", metadata: "pending", progress: message, progressAt: new Date().toISOString() } }), updatedAt: new Date() }).where(eq(repositories.id, repository.id));
+    }).catch(error => console.warn("Could not persist mirror progress", error));
+  };
   try {
+    if (hf) {
+      const source = findSourceForRepository(repository, sources)!;
+      const fresh = await new HuggingFaceSourceProvider(sourceConnectionFromSource(source), currentGitSignal(), reportProgress).getRepository(repository.owner, repository.name, repository.repoType);
+      repository = { ...repository, isPrivate: fresh.isPrivate, isGated: fresh.isGated ?? false, hasLFS: fresh.hasLFS, size: fresh.size };
+      await db.update(repositories).set({ isPrivate: repository.isPrivate, isGated: repository.isGated, hasLFS: repository.hasLFS, size: repository.size }).where(eq(repositories.id, repository.id));
+    }
     const outcome = await runPushMirror({
       clonePath: clonePathForRepository(repository),
       sourceCloneUrl: repository.cloneUrl,
@@ -153,11 +200,27 @@ export async function pushMirrorRepository({
       owner,
       name,
       isPrivate: resolveTargetPrivacy(config, repository),
-      description: repository.description,
+      description: hf ? `${marker} ${repository.url} ${(repository.description ?? "").slice(0, 700)}` : repository.description,
+      hf: hf ? {
+        lfs: options.lfs, strategy: config.giteaConfig.backupStrategy ?? "on-force-push", approved,
+        backupDirectory: config.giteaConfig.backupDirectory || path.join(resolveDataDir(), "repo-backups"),
+        blockOnBackupFailure: config.giteaConfig.blockSyncOnBackupFailure !== false,
+        retentionCount: config.giteaConfig.backupRetentionCount ?? 5,
+        retentionDays: config.giteaConfig.backupRetentionDays ?? 30,
+        archiveDirectory, sourceIdentity: identity,
+      } : undefined,
       defaultBranch: repository.defaultBranch,
-      log: (message) => console.log(`${logPrefix} ${message}`),
+      log: reportProgress,
     });
 
+    gitComplete = true;
+    currentGitSignal()?.throwIfAborted();
+    reportProgress("Git and selected large-file content verified; archiving metadata");
+    await progressWrites;
+    if (hf) await archiveHFMetadata({ config, repository, sources, owner: outcome.targetRepository.owner, name: outcome.targetRepository.name, archiveDirectory, options, log: reportProgress });
+
+    await progressWrites;
+    currentGitSignal()?.throwIfAborted();
     const finalLocation = `${outcome.targetRepository.owner}/${outcome.targetRepository.name}`;
     await db
       .update(repositories)
@@ -166,6 +229,7 @@ export async function pushMirrorRepository({
         updatedAt: new Date(),
         lastMirrored: new Date(),
         errorMessage: null,
+        metadata: hf ? JSON.stringify({ hf: { git: "complete", largeFiles: options.lfs ? "complete" : "excluded", metadata: options.mirrorMetadata || options.mirrorIssues || options.mirrorPullRequests ? "complete" : "excluded", archivedAt: new Date().toISOString() } }) : repository.metadata,
         mirroredLocation: finalLocation,
         destinationProvider: destination.provider,
         destinationUrl: destination.url,
@@ -195,15 +259,18 @@ export async function pushMirrorRepository({
 
     return outcome;
   } catch (error) {
+    await progressWrites;
     const message = error instanceof Error ? error.message : "Unknown error";
+    const failureStatus = currentGitSignal()?.aborted ? "ignored" : error instanceof PendingApprovalError ? "pending-approval" : "failed";
     console.error(`${logPrefix} failed: ${message}`);
 
     await db
       .update(repositories)
       .set({
-        status: repoStatusEnum.parse("failed"),
+        status: repoStatusEnum.parse(failureStatus),
         updatedAt: new Date(),
         errorMessage: message,
+        metadata: hf ? JSON.stringify({ hf: { git: gitComplete ? "complete" : "incomplete", largeFiles: options.lfs ? (gitComplete ? "complete" : "incomplete") : "excluded", metadata: "incomplete", error: message } }) : repository.metadata,
       })
       .where(eq(repositories.id, repository.id!));
 
@@ -216,12 +283,10 @@ export async function pushMirrorRepository({
           ? `Failed to mirror repository: ${repository.name}`
           : `Failed to sync repository: ${repository.name}`,
       details: `Repository ${repository.fullName} could not be pushed to ${label}. Error: ${message}`,
-      status: "failed",
+      status: failureStatus,
       jobType,
     });
 
-    throw new Error(
-      effectiveMode === "mirror" ? `Failed to mirror repository: ${message}` : `Failed to sync repository: ${message}`
-    );
+    throw currentGitSignal()?.aborted ? currentGitSignal()!.reason : error;
   }
 }

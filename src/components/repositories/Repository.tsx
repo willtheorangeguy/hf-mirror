@@ -64,7 +64,7 @@ export default function Repository() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const { user } = useAuth();
   const { registerRefreshCallback, isLiveEnabled } = useLiveRefresh();
-  const { isGitHubConfigured, isFullyConfigured, hasAnySource, autoMirrorStarred, githubOwner, sources } = useConfigStatus();
+  const { isSourceConfigured, isFullyConfigured, hasAnySource, autoMirrorStarred, sourceOwner, sources } = useConfigStatus();
   const { navigationKey } = useNavigation();
   const { filter, setFilter } = useFilterParams({
     searchTerm: "",
@@ -90,6 +90,8 @@ export default function Repository() {
   const [duplicateRepoCandidate, setDuplicateRepoCandidate] = useState<{
     owner: string;
     repo: string;
+    repoType?: "model" | "dataset" | "space";
+    sourceId?: string;
   } | null>(null);
   const [isDuplicateRepoDialogOpen, setIsDuplicateRepoDialogOpen] = useState(false);
   const [isProcessingDuplicateRepo, setIsProcessingDuplicateRepo] = useState(false);
@@ -123,7 +125,7 @@ export default function Repository() {
 
     // Don't fetch repositories if no source exists at all (public-only
     // sources count) or while the config is still loading.
-    if (!isGitHubConfigured && !hasAnySource) {
+    if (!isSourceConfigured && !hasAnySource) {
       setIsInitialLoading(false);
       return false;
     }
@@ -135,7 +137,7 @@ export default function Repository() {
       }
 
       const response = await apiRequest<RepositoryApiResponse>(
-        `/github/repositories?userId=${user.id}`,
+        `/source/repositories?userId=${user.id}`,
         {
           method: "GET",
         }
@@ -163,7 +165,7 @@ export default function Repository() {
         setIsInitialLoading(false);
       }
     }
-  }, [user?.id, isGitHubConfigured, hasAnySource]); // Only depend on user.id, not entire user object
+  }, [user?.id, isSourceConfigured, hasAnySource]); // Only depend on user.id, not entire user object
 
   useEffect(() => {
     // Reset loading state when component becomes active
@@ -174,7 +176,7 @@ export default function Repository() {
   // Register with global live refresh system
   useEffect(() => {
     // Only register for live refresh when a source can own repositories
-    if (!isGitHubConfigured && !hasAnySource) {
+    if (!isSourceConfigured && !hasAnySource) {
       return;
     }
 
@@ -183,7 +185,7 @@ export default function Repository() {
     });
 
     return unregister;
-  }, [registerRefreshCallback, fetchRepositories, isGitHubConfigured, hasAnySource]);
+  }, [registerRefreshCallback, fetchRepositories, isSourceConfigured, hasAnySource]);
 
   const handleRefresh = async () => {
     const success = await fetchRepositories(false); // Manual refresh, show loading skeleton
@@ -253,9 +255,9 @@ export default function Repository() {
       const matched = sources.find(
         (source) => source.provider === repoSource.provider && normalizeSourceUrl(source.url, source.provider) === repoSource.url
       );
-      return matched?.username.toLowerCase() ?? githubOwner.toLowerCase();
+      return matched?.username.toLowerCase() ?? sourceOwner.toLowerCase();
     },
-    [usernameBySourceId, sources, githubOwner]
+    [usernameBySourceId, sources, sourceOwner]
   );
 
   const handleMirrorAllRepos = async () => {
@@ -325,7 +327,7 @@ export default function Repository() {
   // Bulk action handlers
   const handleBulkMirror = async () => {
     if (selectedRepoIds.size === 0) return;
-    
+
     const selectedRepos = repositories.filter(repo => repo.id && selectedRepoIds.has(repo.id));
     const eligibleRepos = selectedRepos.filter(
       repo => repo.status === "imported" || repo.status === "failed" || repo.status === "pending-approval"
@@ -371,7 +373,7 @@ export default function Repository() {
 
   const handleBulkSync = async () => {
     if (selectedRepoIds.size === 0) return;
-    
+
     const selectedRepos = repositories.filter(repo => repo.id && selectedRepoIds.has(repo.id));
     const eligibleRepos = selectedRepos.filter(
       repo => ["mirrored", "synced", "archived"].includes(repo.status)
@@ -383,7 +385,7 @@ export default function Repository() {
     }
 
     const repoIds = eligibleRepos.map(repo => repo.id as string);
-    
+
     setLoadingRepoIds(prev => {
       const newSet = new Set(prev);
       repoIds.forEach(id => newSet.add(id));
@@ -478,7 +480,7 @@ export default function Repository() {
 
   const handleBulkRetry = async () => {
     if (selectedRepoIds.size === 0) return;
-    
+
     const selectedRepos = repositories.filter(repo => repo.id && selectedRepoIds.has(repo.id));
     const eligibleRepos = selectedRepos.filter(repo => repo.status === "failed");
 
@@ -488,7 +490,7 @@ export default function Repository() {
     }
 
     const repoIds = eligibleRepos.map(repo => repo.id as string);
-    
+
     setLoadingRepoIds(prev => {
       const newSet = new Set(prev);
       repoIds.forEach(id => newSet.add(id));
@@ -522,12 +524,12 @@ export default function Repository() {
 
   const handleBulkSkip = async (skip: boolean) => {
     if (selectedRepoIds.size === 0) return;
-    
+
     const selectedRepos = repositories.filter(repo => repo.id && selectedRepoIds.has(repo.id));
-    const eligibleRepos = skip 
-      ? selectedRepos.filter(repo => 
-          repo.status !== "ignored" && 
-          repo.status !== "mirroring" && 
+    const eligibleRepos = skip
+      ? selectedRepos.filter(repo =>
+          repo.status !== "ignored" &&
+          repo.status !== "mirroring" &&
           repo.status !== "syncing"
         )
       : selectedRepos.filter(repo => repo.status === "ignored");
@@ -538,7 +540,7 @@ export default function Repository() {
     }
 
     const repoIds = eligibleRepos.map(repo => repo.id as string);
-    
+
     setLoadingRepoIds(prev => {
       const newSet = new Set(prev);
       repoIds.forEach(id => newSet.add(id));
@@ -548,7 +550,7 @@ export default function Repository() {
     try {
       // Update each repository's status
       const newStatus = skip ? "ignored" : "imported";
-      const promises = repoIds.map(repoId => 
+      const promises = repoIds.map(repoId =>
         apiRequest<{ success: boolean; repository?: Repository; error?: string }>(
           `/repositories/${repoId}/status`,
           {
@@ -557,13 +559,13 @@ export default function Repository() {
           }
         )
       );
-      
+
       const results = await Promise.allSettled(promises);
       const successCount = results.filter(r => r.status === "fulfilled" && (r.value as any).success).length;
-      
+
       if (successCount > 0) {
         toast.success(`${successCount} repositories ${skip ? "ignored" : "included"}`);
-        
+
         // Update local state for successful updates
         const successfulRepoIds = new Set<string>();
         results.forEach((result, index) => {
@@ -571,7 +573,7 @@ export default function Repository() {
             successfulRepoIds.add(repoIds[index]);
           }
         });
-        
+
         setRepositories(prevRepos =>
           prevRepos.map(repo => {
             if (repo.id && successfulRepoIds.has(repo.id)) {
@@ -580,10 +582,10 @@ export default function Repository() {
             return repo;
           })
         );
-        
+
         setSelectedRepoIds(new Set());
       }
-      
+
       if (successCount < repoIds.length) {
         toast.error(`Failed to ${skip ? "ignore" : "include"} ${repoIds.length - successCount} repositories`);
       }
@@ -657,7 +659,7 @@ export default function Repository() {
       });
 
       const newStatus = skip ? "ignored" : "imported";
-      
+
       // Update repository status via API
       const response = await apiRequest<{ success: boolean; repository?: Repository; error?: string }>(
         `/repositories/${repoId}/status`,
@@ -811,13 +813,15 @@ export default function Repository() {
     destinationOrg,
     host,
     path,
+    repoType = "model",
+    sourceId,
   }: {
     repo: string;
     owner: string;
     force?: boolean;
     destinationOrg?: string;
     host?: string;
-    path?: string[];
+    path?: string[]; repoType?: "model" | "dataset" | "space"; sourceId?: string;
   }) => {
     if (!user || !user.id) {
       return;
@@ -831,7 +835,7 @@ export default function Repository() {
       throw new Error("Invalid repository details");
     }
 
-    const normalizedFullName = `${trimmedOwner}/${trimmedRepo}`.toLowerCase();
+    const normalizedFullName = `${repoType}:${trimmedOwner}/${trimmedRepo}`.toLowerCase();
 
     if (!force) {
       const duplicateRepo = repositories.find(
@@ -840,7 +844,7 @@ export default function Repository() {
 
       if (duplicateRepo) {
         toast.warning("Repository already exists.");
-        setDuplicateRepoCandidate({ repo: trimmedRepo, owner: trimmedOwner });
+        setDuplicateRepoCandidate({ repo: trimmedRepo, owner: trimmedOwner, repoType, sourceId });
         setIsDuplicateRepoDialogOpen(true);
         throw new Error("Repository already exists");
       }
@@ -849,6 +853,8 @@ export default function Repository() {
     try {
       const reqPayload: AddRepositoriesApiRequest = {
         userId: user.id,
+        repoType,
+        sourceId,
         repo: trimmedRepo,
         owner: trimmedOwner,
         force,
@@ -915,6 +921,8 @@ export default function Repository() {
       await handleAddRepository({
         repo: duplicateRepoCandidate.repo,
         owner: duplicateRepoCandidate.owner,
+        repoType: duplicateRepoCandidate.repoType,
+        sourceId: duplicateRepoCandidate.sourceId,
         force: true,
       });
       setIsDialogOpen(false);
@@ -954,7 +962,7 @@ export default function Repository() {
       );
 
       if (response.success) {
-        toast.success(`Removed ${repoToDelete.fullName} from Gitea Mirror.`);
+        toast.success(`Removed ${repoToDelete.fullName} from HF-mirror.`);
         await fetchRepositories(false);
       } else {
         showErrorToast(response.error || "Failed to delete repository", toast);
@@ -978,7 +986,7 @@ export default function Repository() {
       );
       if (response.success) {
         const count = response.deleted ?? selectedRepoIds.size;
-        toast.success(`Removed ${count} ${count === 1 ? "repository" : "repositories"} from Gitea Mirror.`);
+        toast.success(`Removed ${count} ${count === 1 ? "repository" : "repositories"} from HF-mirror.`);
         setSelectedRepoIds(new Set());
         await fetchRepositories(false);
       } else {
@@ -995,16 +1003,16 @@ export default function Repository() {
   // Determine what actions are available for selected repositories
   const getAvailableActions = () => {
     if (selectedRepoIds.size === 0) return [];
-    
+
     const selectedRepos = repositories.filter(repo => repo.id && selectedRepoIds.has(repo.id));
-    
+
     const actions = [];
-    
+
     // Check if any selected repos can be mirrored
     if (selectedRepos.some(repo => repo.status === "imported" || repo.status === "failed" || repo.status === "pending-approval")) {
       actions.push('mirror');
     }
-    
+
     // Check if any selected repos can be synced
     if (selectedRepos.some(repo => repo.status === "mirrored" || repo.status === "synced")) {
       actions.push('sync');
@@ -1013,17 +1021,17 @@ export default function Repository() {
     if (selectedRepos.some(repo => ["mirrored", "synced", "archived"].includes(repo.status))) {
       actions.push('rerun-metadata');
     }
-    
+
     // Check if any selected repos are failed
     if (selectedRepos.some(repo => repo.status === "failed")) {
       actions.push('retry');
     }
-    
+
     // Check if any selected repos can be ignored
     if (selectedRepos.some(repo => repo.status !== "ignored")) {
       actions.push('ignore');
     }
-    
+
     // Check if any selected repos can be included (unignored)
     if (selectedRepos.some(repo => repo.status === "ignored")) {
       actions.push('include');
@@ -1033,13 +1041,13 @@ export default function Repository() {
 
     return actions;
   };
-  
+
   const availableActions = getAvailableActions();
-  
+
   // Get counts for eligible repositories for each action
   const getActionCounts = () => {
     const selectedRepos = repositories.filter(repo => repo.id && selectedRepoIds.has(repo.id));
-    
+
     return {
       mirror: selectedRepos.filter(repo => repo.status === "imported" || repo.status === "failed" || repo.status === "pending-approval").length,
       sync: selectedRepos.filter(repo => repo.status === "mirrored" || repo.status === "synced").length,
@@ -1050,7 +1058,7 @@ export default function Repository() {
       delete: selectedRepos.length,
     };
   };
-  
+
   const actionCounts = getActionCounts();
 
   // Check if any filters are active
@@ -1087,13 +1095,13 @@ export default function Repository() {
               }
             />
           </div>
-          
+
           {/* Mobile Filter Drawer */}
           <Drawer>
             <DrawerTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
+              <Button
+                variant="outline"
+                size="icon"
                 className="relative h-10 w-10 shrink-0"
               >
                 <Filter className="h-4 w-4" />
@@ -1111,7 +1119,7 @@ export default function Repository() {
                   Narrow down your repository list
                 </DrawerDescription>
               </DrawerHeader>
-              
+
               <div className="px-4 py-6 space-y-6 overflow-y-auto">
                 {/* Active filters summary */}
                 {hasActiveFilters && (
@@ -1267,7 +1275,7 @@ export default function Repository() {
                   </Select>
                 </div>
               </div>
-              
+
               <DrawerFooter className="gap-2 px-4 pt-2 pb-4 border-t">
                 <DrawerClose asChild>
                   <Button className="w-full" size="sm">
@@ -1282,7 +1290,7 @@ export default function Repository() {
               </DrawerFooter>
             </DrawerContent>
           </Drawer>
-          
+
           <Button
             variant="outline"
             size="icon"
@@ -1505,7 +1513,7 @@ export default function Repository() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <div className="flex gap-2 flex-wrap">
               {availableActions.includes('mirror') && (
             <Button
@@ -1518,7 +1526,7 @@ export default function Repository() {
               <span>Mirror </span>({actionCounts.mirror})
             </Button>
           )}
-          
+
           {availableActions.includes('sync') && (
             <Button
               variant="outline"
@@ -1542,7 +1550,7 @@ export default function Repository() {
               Re-run Metadata ({actionCounts.rerunMetadata})
             </Button>
           )}
-          
+
           {availableActions.includes('retry') && (
             <Button
               variant="outline"
@@ -1554,7 +1562,7 @@ export default function Repository() {
               Retry
             </Button>
           )}
-          
+
           {availableActions.includes('ignore') && (
             <Button
               variant="ghost"
@@ -1566,7 +1574,7 @@ export default function Repository() {
               Ignore
             </Button>
           )}
-          
+
           {availableActions.includes('include') && (
             <Button
               variant="outline"
@@ -1592,11 +1600,11 @@ export default function Repository() {
         </div>
       )}
 
-      {!isGitHubConfigured && !hasAnySource ? (
+      {!isSourceConfigured && !hasAnySource ? (
         <div className="flex flex-col items-center justify-center p-8 border border-dashed rounded-md">
           <h3 className="text-xl font-semibold mb-2">No Source Configured</h3>
           <p className="text-muted-foreground text-center mb-4">
-            Connect a GitHub, GitLab or Gitea source — or add a public organization without an account — to start mirroring repositories.
+            Connect a Hugging Face source — or add a public organization without an account — to start mirroring repositories.
           </p>
           <Button
             variant="default"
@@ -1650,7 +1658,7 @@ export default function Repository() {
           <DialogHeader>
             <DialogTitle>Repository already exists</DialogTitle>
             <DialogDescription>
-              {duplicateRepoCandidate ? `${duplicateRepoCandidate.owner}/${duplicateRepoCandidate.repo}` : "This repository"} is already tracked in Gitea Mirror. Continuing will refresh the existing entry without creating a duplicate.
+              {duplicateRepoCandidate ? `${duplicateRepoCandidate.owner}/${duplicateRepoCandidate.repo}` : "This repository"} is already tracked in HF-mirror. Continuing will refresh the existing entry without creating a duplicate.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1676,9 +1684,9 @@ export default function Repository() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove {selectedRepoIds.size} {selectedRepoIds.size === 1 ? "repository" : "repositories"} from Gitea Mirror?</DialogTitle>
+            <DialogTitle>Remove {selectedRepoIds.size} {selectedRepoIds.size === 1 ? "repository" : "repositories"} from HF-mirror?</DialogTitle>
             <DialogDescription>
-              These repositories will be deleted from Gitea Mirror only. Any mirrors on Gitea will remain untouched; remove them manually in Gitea if needed.
+              These repositories will be deleted from HF-mirror only. Any mirrors on Gitea will remain untouched; remove them manually in Gitea if needed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1714,9 +1722,9 @@ export default function Repository() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove repository from Gitea Mirror?</DialogTitle>
+            <DialogTitle>Remove repository from HF-mirror?</DialogTitle>
             <DialogDescription>
-              {repoToDelete?.fullName ?? "This repository"} will be deleted from Gitea Mirror only. The mirror on Gitea will remain untouched; remove it manually in Gitea if needed.
+              {repoToDelete?.fullName ?? "This repository"} will be deleted from HF-mirror only. The mirror on Gitea will remain untouched; remove it manually in Gitea if needed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

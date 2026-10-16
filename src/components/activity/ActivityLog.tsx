@@ -9,15 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { apiRequest, cn, formatDate, showErrorToast } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import type { MirrorJob } from '@/lib/db/schema';
@@ -449,13 +441,13 @@ export function ActivityLog() {
               }
             />
           </div>
-          
+
           {/* Mobile Filter Drawer */}
           <Drawer>
             <DrawerTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
+              <Button
+                variant="outline"
+                size="icon"
                 className="relative h-10 w-10 shrink-0"
               >
                 <Filter className="h-4 w-4" />
@@ -473,7 +465,7 @@ export function ActivityLog() {
                   Narrow down your activity log
                 </DrawerDescription>
               </DrawerHeader>
-              
+
               <div className="px-4 py-6 space-y-6 overflow-y-auto">
                 {/* Active filters summary */}
                 {hasActiveFilters && (
@@ -587,7 +579,7 @@ export function ActivityLog() {
                   />
                 </div>
               </div>
-              
+
               <DrawerFooter className="gap-2 px-4 pt-2 pb-4 border-t">
                 <DrawerClose asChild>
                   <Button className="w-full" size="sm">
@@ -602,8 +594,8 @@ export function ActivityLog() {
               </DrawerFooter>
             </DrawerContent>
           </Drawer>
-          
-          
+
+
           <Button
             variant="outline"
             size="icon"
@@ -613,7 +605,7 @@ export function ActivityLog() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant="outline"
             size="icon"
@@ -894,7 +886,7 @@ export function ActivityLog() {
       {/* Mobile FAB for Export - only visible on mobile */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button 
+          <Button
             className="fixed bottom-4 right-4 rounded-full h-12 w-12 shadow-lg p-0 z-10 lg:hidden"
             variant="default"
           >

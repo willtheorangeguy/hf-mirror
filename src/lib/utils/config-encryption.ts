@@ -8,35 +8,30 @@ import type { Config } from "@/types/config";
  */
 export function decryptConfigTokens(config: Config): Config {
   const decryptedConfig = { ...config };
-  
+
   // Deep clone the config objects
-  if (config.githubConfig) {
-    decryptedConfig.githubConfig = { ...config.githubConfig };
-    if (config.githubConfig.token) {
-      decryptedConfig.githubConfig.token = decrypt(config.githubConfig.token);
+  if (config.sourceConfig) {
+    decryptedConfig.sourceConfig = { ...config.sourceConfig };
+    if (config.sourceConfig.token) {
+      decryptedConfig.sourceConfig.token = decrypt(config.sourceConfig.token);
     }
   }
-  
+
   if (config.giteaConfig) {
     decryptedConfig.giteaConfig = { ...config.giteaConfig };
     if (config.giteaConfig.token) {
       decryptedConfig.giteaConfig.token = decrypt(config.giteaConfig.token);
     }
   }
-  
+
   return decryptedConfig;
 }
 
-/**
- * Gets a decrypted GitHub token from config
- * @param config The config object
- * @returns Decrypted GitHub token
- */
-export function getDecryptedGitHubToken(config: Config): string {
-  if (!config.githubConfig?.token) {
-    throw new Error("GitHub token not found in config");
+export function getDecryptedSourceToken(config: Config): string {
+  if (!config.sourceConfig?.token) {
+    throw new Error("HF token not found in config");
   }
-  return decrypt(config.githubConfig.token);
+  return decrypt(config.sourceConfig.token);
 }
 
 /**

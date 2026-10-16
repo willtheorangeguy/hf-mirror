@@ -1,0 +1,54 @@
+services:
+  gitea:
+    image: gitea/gitea:1.22.6@sha256:538658de667c5d098a274f2f63aa6ec891d88f670cdd5282cf27221ba747dda4
+    environment:
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__server__ROOT_URL: http://gitea:3000/
+      GITEA__server__LFS_START_SERVER: "true"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__log__LEVEL: Warn
+    ports: ["127.0.0.1:${E2E_GITEA_PORT:-4333}:3000"]
+    volumes: ["gitea-data:/data"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/v1/version"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+  source:
+    image: hf-mirror:e2e
+    entrypoint: ["bun", "/tests/fixture.ts"]
+    volumes: ["./:/tests:ro"]
+    tmpfs: ["/fixture:mode=1777"]
+    ports: ["127.0.0.1:${E2E_SOURCE_PORT:-4591}:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/__test/state"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+  app:
+    image: hf-mirror:e2e
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4321"
+      DATABASE_URL: file:data/hf-mirror.db
+      BETTER_AUTH_SECRET: container-e2e-only-secret-do-not-use-in-production
+      ENCRYPTION_SECRET: container-e2e-encryption-only-32chars
+      BETTER_AUTH_URL: http://localhost:${E2E_APP_PORT:-4328}
+      PUBLIC_BETTER_AUTH_URL: http://localhost:${E2E_APP_PORT:-4328}
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:${E2E_APP_PORT:-4328}
+      ASTRO_TELEMETRY_DISABLED: "1"
+    ports: ["127.0.0.1:${E2E_APP_PORT:-4328}:4321"]
+    volumes: ["app-data:/app/data"]
+    depends_on:
+      gitea: { condition: service_healthy }
+      source: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4321/api/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+volumes:
+  gitea-data:
+  app-data:

@@ -1,4 +1,4 @@
-import { SiGitea, SiGithub, SiGitlab } from "react-icons/si";
+import { SiHuggingface } from "react-icons/si";
 import {
   SOURCE_PROVIDER_LABELS,
   getRepositorySource,
@@ -7,9 +7,7 @@ import {
 } from "@/lib/source-providers/kinds";
 
 const icons: Record<SourceProviderKind, React.ComponentType<{ className?: string }>> = {
-  github: SiGithub,
-  gitlab: SiGitlab,
-  gitea: SiGitea,
+  huggingface: SiHuggingface,
 };
 
 /** Brand icon for the host a repository came from. */
@@ -20,7 +18,7 @@ export function SourceIcon({
   provider: SourceProviderKind;
   className?: string;
 }) {
-  const Icon = icons[provider] ?? SiGithub;
+  const Icon = icons[provider] ?? SiHuggingface;
   return <Icon className={className} />;
 }
 

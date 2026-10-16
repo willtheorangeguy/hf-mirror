@@ -90,7 +90,7 @@ export interface MirrorOverridesDialogProps {
   /** Repository-only: drives the starred-code-only gating. */
   isStarred?: boolean;
   starredCodeOnly?: boolean;
-  /** The configured destination kind; GitHub and GitLab targets disable every toggle. */
+
   destinationProvider?: string | null;
   onSave: (overrides: MirrorOverrides | null) => Promise<void>;
 }

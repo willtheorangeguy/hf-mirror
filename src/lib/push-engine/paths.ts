@@ -42,17 +42,17 @@ function hostOf(url: string): string {
 }
 
 export interface ClonePathInput {
-  /** Base URL of the source host, e.g. https://github.com. */
+  /** Base URL of the HF source connection. */
   sourceUrl: string;
   owner: string;
   name: string;
 }
 
-export type CloneRepositoryFields = RepositorySourceFields & { owner: string; name: string };
+export type CloneRepositoryFields = RepositorySourceFields & { owner: string; name: string; repoType?: string; sourceId?: string | null };
 
 /** The clone path for a stored repository row: its source host, owner and name. */
 export function clonePathForRepository(repo: CloneRepositoryFields, root?: string): string {
-  return clonePathFor({ sourceUrl: getRepositorySource(repo).url, owner: repo.owner, name: repo.name }, root);
+  return clonePathFor({ sourceUrl: getRepositorySource(repo).url, owner: repo.owner, name: `${repo.repoType ?? "model"}--${repo.sourceId ?? "public"}--${repo.name}` }, root);
 }
 
 /** Absolute path of the bare clone for a repository. */

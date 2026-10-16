@@ -7,15 +7,13 @@
  * to know which host it is dealing with.
  */
 import type { Config, Repository } from "@/lib/db/schema";
-import { getDecryptedGitHubToken } from "@/lib/utils/config-encryption";
+import { getDecryptedSourceToken } from "@/lib/utils/config-encryption";
 import {
   decryptSourceToken,
   findSourceForRepository,
   type SourceRecord,
 } from "@/lib/sources";
-import { GiteaSourceProvider } from "./gitea-source";
-import { GitHubSourceProvider } from "./github-source";
-import { GitLabSourceProvider } from "./gitlab";
+import { HuggingFaceSourceProvider } from "./huggingface";
 import {
   describeSource,
   getRepositorySource,
@@ -31,11 +29,10 @@ export * from "./kinds";
 export type * from "./types";
 export { SourceApiError, isSourceNotFound } from "./http";
 
-/** The provider kind a config selects, defaulting to GitHub. */
 export function resolveSourceProviderKind(
   config: Partial<Config> | null | undefined
 ): SourceProviderKind {
-  return normalizeSourceProviderKind(config?.githubConfig?.provider);
+  return normalizeSourceProviderKind(config?.sourceConfig?.provider);
 }
 
 /** Build the connection details for a config. The token is passed in decrypted. */
@@ -46,23 +43,16 @@ export function resolveSourceConnection(
   const provider = resolveSourceProviderKind(config);
   return {
     provider,
-    url: normalizeSourceUrl(config.githubConfig?.url, provider),
-    username: config.githubConfig?.owner ?? "",
+    url: normalizeSourceUrl(config.sourceConfig?.url, provider),
+    username: config.sourceConfig?.owner ?? "",
     token,
     userId: userId ?? config.userId,
   };
 }
 
 export function createSourceProvider(connection: SourceConnection): SourceProvider {
-  switch (connection.provider) {
-    case "gitlab":
-      return new GitLabSourceProvider(connection);
-    case "gitea":
-      return new GiteaSourceProvider(connection);
-    case "github":
-    default:
-      return new GitHubSourceProvider(connection);
-  }
+  if (connection.provider !== "huggingface") throw new Error("HF-mirror supports Hugging Face sources only");
+  return new HuggingFaceSourceProvider(connection);
 }
 
 /** Build the provider for a stored config, decrypting the token. */
@@ -70,7 +60,7 @@ export function createSourceProviderFromConfig(
   config: Partial<Config>,
   { userId }: { userId?: string } = {}
 ): SourceProvider {
-  const token = config.githubConfig?.token ? getDecryptedGitHubToken(config as Config) : "";
+  const token = config.sourceConfig?.token ? getDecryptedSourceToken(config as Config) : "";
   return createSourceProvider(resolveSourceConnection(config, { token, userId }));
 }
 
@@ -96,13 +86,6 @@ export function createSourceProviderFromSource(
   return createSourceProvider(sourceConnectionFromSource(source, { userId }));
 }
 
-/**
- * Refuse to mirror a repository with credentials for a different host.
- *
- * A repository imported from GitHub must not be sent to Gitea with the GitLab
- * token that is configured now: the token would leak to the wrong host and
- * the fetch would fail anyway.
- */
 export function assertRepositoryMatchesConfiguredSource({
   repository,
   config,
@@ -133,7 +116,8 @@ export function assertRepositoryMatchesConnectedSource({
   repository: Pick<Repository, "fullName"> & RepositorySourceFields & { sourceId?: string | null };
   sources: SourceRecord[];
 }): void {
-  if (findSourceForRepository(repository, sources)) return;
+  const matched = findSourceForRepository(repository, sources);
+  if (matched && matched.enabled !== false) return;
 
   const connected = sources.length
     ? sources.map((source) => describeSource(source)).join(", ")

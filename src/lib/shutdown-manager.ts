@@ -1,7 +1,7 @@
 /**
  * Shutdown Manager for Graceful Application Termination
  *
- * This module provides centralized shutdown coordination for the gitea-mirror application.
+ * This module provides centralized shutdown coordination for the hf-mirror application.
  * It ensures that:
  * - In-progress jobs are properly saved to the database
  * - Database connections are closed cleanly
@@ -10,8 +10,7 @@
  */
 
 import { db, mirrorJobs } from './db';
-import { eq, and } from 'drizzle-orm';
-import type { MirrorJob } from './db/schema';
+import { eq } from "drizzle-orm";
 
 // Shutdown state tracking
 let shutdownInProgress = false;

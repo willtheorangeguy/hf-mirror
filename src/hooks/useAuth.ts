@@ -1,11 +1,5 @@
 import * as React from "react";
-import {
-  useState,
-  useEffect,
-  createContext,
-  useContext,
-  type Context,
-} from "react";
+import { useState, createContext, useContext, type Context } from "react";
 import { authClient, useSession as useBetterAuthSession } from "@/lib/auth-client";
 import type { Session, AuthUser } from "@/lib/auth-client";
 import { withBase } from "@/lib/base-path";
@@ -49,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         callbackURL: withBase("/"),
       });
-      
+
       if (result.error) {
         throw new Error(result.error.message || "Login failed");
       }

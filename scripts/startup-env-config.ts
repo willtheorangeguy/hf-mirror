@@ -11,7 +11,7 @@
 import { initializeConfigFromEnv } from "../src/lib/env-config-loader";
 
 async function runEnvConfigInitialization() {
-  console.log('=== Gitea Mirror Environment Configuration ===');
+  console.log('=== HF-mirror Environment Configuration ===');
   console.log('Loading configuration from environment variables...');
   console.log('');
 
@@ -19,19 +19,19 @@ async function runEnvConfigInitialization() {
 
   try {
     await initializeConfigFromEnv();
-    
+
     const endTime = Date.now();
     const duration = endTime - startTime;
-    
+
     console.log(`✅ Environment configuration loaded successfully in ${duration}ms`);
     process.exit(0);
   } catch (error) {
     const endTime = Date.now();
     const duration = endTime - startTime;
-    
+
     console.error(`❌ Failed to load environment configuration after ${duration}ms:`, error);
     console.error('Application will start anyway, but environment configuration was not loaded.');
-    
+
     // Exit with error code but allow startup to continue
     process.exit(1);
   }

@@ -7,14 +7,14 @@ import { db, configs, users, repositories } from '@/lib/db';
 import { eq, and, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { encrypt } from '@/lib/utils/encryption';
-import { isSourceProviderKind, type SourceProviderKind } from '@/lib/source-providers/kinds';
+import { type SourceProviderKind } from "@/lib/source-providers/kinds";
 import { DESTINATION_PROVIDER_DEFAULT_URLS, isDestinationProviderKind, type DestinationProviderKind } from '@/lib/destination-kinds';
 import { hasDestinationChanged, hasSourceChanged, loadConfigLocks } from '@/lib/config-locks';
 import type { SourceUpdateInput } from '@/lib/sources';
 import { normalizeReleaseAssetLimit } from '@/lib/utils/mirror-overrides';
 
 interface EnvConfig {
-  github: {
+  source: {
     provider?: SourceProviderKind;
     url?: string;
     username?: string;
@@ -91,17 +91,7 @@ interface EnvConfig {
     autoImport?: boolean;
     autoMirror?: boolean;
   };
-  cleanup: {
-    enabled?: boolean;
-    retentionDays?: number;
-    deleteFromGitea?: boolean;
-    deleteIfNotInGitHub?: boolean;
-    protectedRepos?: string[];
-    dryRun?: boolean;
-    orphanedRepoAction?: 'skip' | 'archive' | 'delete';
-    batchSize?: number;
-    pauseBetweenDeletes?: number;
-  };
+  cleanup: { enabled?: boolean; retentionDays?: number };
 }
 
 /**
@@ -109,9 +99,7 @@ interface EnvConfig {
  */
 function parseEnvConfig(): EnvConfig {
   // Parse protected repos from comma-separated string
-  const protectedRepos = process.env.CLEANUP_PROTECTED_REPOS 
-    ? process.env.CLEANUP_PROTECTED_REPOS.split(',').map(r => r.trim()).filter(Boolean)
-    : undefined;
+
   const includeOrganizations = process.env.INCLUDE_ORGANIZATIONS
     ? process.env.INCLUDE_ORGANIZATIONS.split(',').map((org) => org.trim()).filter(Boolean)
     : undefined;
@@ -120,19 +108,17 @@ function parseEnvConfig(): EnvConfig {
     : undefined;
 
   return {
-    github: {
-      // SOURCE_PROVIDER picks GitHub, GitLab or Gitea/Forgejo; SOURCE_URL is
+    source: {
+
       // the instance base URL for the last two. Username and token still come
-      // from GITHUB_USERNAME and GITHUB_TOKEN whatever the provider.
-      provider: isSourceProviderKind(process.env.SOURCE_PROVIDER)
-        ? process.env.SOURCE_PROVIDER
-        : undefined,
+      // from HF_USERNAME and HF_TOKEN whatever the provider.
+      provider: "huggingface",
       url: process.env.SOURCE_URL,
-      username: process.env.GITHUB_USERNAME,
-      token: process.env.GITHUB_TOKEN,
-      type: process.env.GITHUB_TYPE as 'personal' | 'organization',
-      privateRepositories: process.env.PRIVATE_REPOSITORIES === 'true',
-      publicRepositories: process.env.PUBLIC_REPOSITORIES === 'true',
+      username: process.env.HF_USERNAME,
+      token: process.env.HF_TOKEN,
+      type: process.env.HF_TYPE as 'personal' | 'organization',
+      privateRepositories: process.env.PRIVATE_REPOSITORIES !== 'false',
+      publicRepositories: process.env.PUBLIC_REPOSITORIES !== 'false',
       // Tri-state parse so unset falls through to existingConfig / schema default (true).
       includeCollaboratorRepos:
         process.env.INCLUDE_COLLABORATOR_REPOS === 'true' ? true
@@ -155,7 +141,7 @@ function parseEnvConfig(): EnvConfig {
     },
     gitea: {
       // DESTINATION_PROVIDER picks Gitea or Forgejo (pull mirrors, same API),
-      // or GitHub or GitLab (push targets served by the push engine).
+
       provider: isDestinationProviderKind(process.env.DESTINATION_PROVIDER)
         ? process.env.DESTINATION_PROVIDER
         : undefined,
@@ -165,35 +151,33 @@ function parseEnvConfig(): EnvConfig {
       token: process.env.GITEA_TOKEN,
       organization: process.env.GITEA_ORGANIZATION,
       visibility: process.env.GITEA_ORG_VISIBILITY as 'public' | 'private' | 'limited' | 'default',
-      mirrorInterval: process.env.GITEA_MIRROR_INTERVAL,
-      lfs: process.env.GITEA_LFS === 'true',
+      lfs: process.env.GITEA_LFS !== 'false',
       createOrg: process.env.GITEA_CREATE_ORG === 'true',
       templateOwner: process.env.GITEA_TEMPLATE_OWNER,
       templateRepo: process.env.GITEA_TEMPLATE_REPO,
       addTopics: process.env.GITEA_ADD_TOPICS === 'true',
       topicPrefix: process.env.GITEA_TOPIC_PREFIX,
-      preserveVisibility: process.env.GITEA_PRESERVE_VISIBILITY === 'true',
+      preserveVisibility: process.env.GITEA_PRESERVE_VISIBILITY !== 'false',
       forkStrategy: process.env.GITEA_FORK_STRATEGY as 'skip' | 'reference' | 'full-copy',
     },
     mirror: {
-      mirrorIssues: process.env.MIRROR_ISSUES === 'true',
+      mirrorIssues: process.env.MIRROR_ISSUES !== 'false',
       mirrorWiki: process.env.MIRROR_WIKI === 'true',
       mirrorReleases: process.env.MIRROR_RELEASES === 'true',
-      mirrorPullRequests: process.env.MIRROR_PULL_REQUESTS === 'true',
+      mirrorPullRequests: process.env.MIRROR_PULL_REQUESTS !== 'false',
       mirrorLabels: process.env.MIRROR_LABELS === 'true',
       mirrorMilestones: process.env.MIRROR_MILESTONES === 'true',
-      mirrorMetadata: process.env.MIRROR_METADATA === 'true',
+      mirrorMetadata: process.env.MIRROR_METADATA !== 'false',
       releaseLimit: process.env.RELEASE_LIMIT ? parseInt(process.env.RELEASE_LIMIT, 10) : undefined,
       releaseAssetLimit: process.env.RELEASE_ASSET_LIMIT ? parseInt(process.env.RELEASE_ASSET_LIMIT, 10) : undefined,
       issueConcurrency: process.env.MIRROR_ISSUE_CONCURRENCY ? parseInt(process.env.MIRROR_ISSUE_CONCURRENCY, 10) : undefined,
       pullRequestConcurrency: process.env.MIRROR_PULL_REQUEST_CONCURRENCY ? parseInt(process.env.MIRROR_PULL_REQUEST_CONCURRENCY, 10) : undefined,
     },
     schedule: {
-      enabled: process.env.SCHEDULE_ENABLED === 'true' || 
-               !!process.env.GITEA_MIRROR_INTERVAL || 
-               !!process.env.SCHEDULE_INTERVAL || 
+      enabled: process.env.SCHEDULE_ENABLED === 'true' ||
+               !!process.env.SCHEDULE_INTERVAL ||
                !!process.env.DELAY, // Auto-enable if any interval is specified
-      interval: process.env.SCHEDULE_INTERVAL || process.env.GITEA_MIRROR_INTERVAL || process.env.DELAY, // Support GITEA_MIRROR_INTERVAL, SCHEDULE_INTERVAL, and old DELAY
+      interval: process.env.SCHEDULE_INTERVAL || process.env.DELAY, // Schedule interval from the runtime environment.
       concurrent: process.env.SCHEDULE_CONCURRENT === 'true',
       batchSize: process.env.SCHEDULE_BATCH_SIZE ? parseInt(process.env.SCHEDULE_BATCH_SIZE, 10) : undefined,
       pauseBetweenBatches: process.env.SCHEDULE_PAUSE_BETWEEN_BATCHES ? parseInt(process.env.SCHEDULE_PAUSE_BETWEEN_BATCHES, 10) : undefined,
@@ -214,16 +198,8 @@ function parseEnvConfig(): EnvConfig {
       autoMirror: process.env.AUTO_MIRROR_REPOS === 'true',
     },
     cleanup: {
-      enabled: process.env.CLEANUP_ENABLED === 'true' || 
-               process.env.CLEANUP_DELETE_IF_NOT_IN_GITHUB === 'true', // Auto-enable if deleteIfNotInGitHub is enabled
+      enabled: process.env.CLEANUP_ENABLED === 'true',
       retentionDays: process.env.CLEANUP_RETENTION_DAYS ? parseInt(process.env.CLEANUP_RETENTION_DAYS, 10) : undefined,
-      deleteFromGitea: process.env.CLEANUP_DELETE_FROM_GITEA === 'true',
-      deleteIfNotInGitHub: process.env.CLEANUP_DELETE_IF_NOT_IN_GITHUB === 'true',
-      protectedRepos,
-      dryRun: process.env.CLEANUP_DRY_RUN === 'true' ? true : process.env.CLEANUP_DRY_RUN === 'false' ? false : false,
-      orphanedRepoAction: process.env.CLEANUP_ORPHANED_REPO_ACTION as 'skip' | 'archive' | 'delete',
-      batchSize: process.env.CLEANUP_BATCH_SIZE ? parseInt(process.env.CLEANUP_BATCH_SIZE, 10) : undefined,
-      pauseBetweenDeletes: process.env.CLEANUP_PAUSE_BETWEEN_DELETES ? parseInt(process.env.CLEANUP_PAUSE_BETWEEN_DELETES, 10) : undefined,
     },
   };
 }
@@ -232,10 +208,10 @@ function parseEnvConfig(): EnvConfig {
  * Check if environment configuration is available
  */
 function hasEnvConfig(envConfig: EnvConfig): boolean {
-  // Check if any GitHub or Gitea config is provided
+
   return !!(
-    envConfig.github.username ||
-    envConfig.github.token ||
+    envConfig.source.username ||
+    envConfig.source.token ||
     envConfig.gitea.url ||
     envConfig.gitea.username ||
     envConfig.gitea.token
@@ -292,15 +268,15 @@ export async function initializeConfigFromEnv(): Promise<void> {
       const stored = existingConfig[0];
       const locks = await loadConfigLocks(userId);
       const incomingSource = {
-        provider: envConfig.github.provider ?? stored.githubConfig?.provider,
-        url: envConfig.github.url ?? stored.githubConfig?.url,
+        provider: envConfig.source.provider ?? stored.sourceConfig?.provider,
+        url: envConfig.source.url ?? stored.sourceConfig?.url,
       };
-      if (locks.source.locked && hasSourceChanged(stored.githubConfig, incomingSource)) {
+      if (locks.source.locked && hasSourceChanged(stored.sourceConfig, incomingSource)) {
         console.warn(
           `[ENV Config Loader] Ignoring SOURCE_PROVIDER/SOURCE_URL: the source is locked because ${locks.source.repositoryCount} repositories were imported from it. Change it on the Configuration page.`
         );
-        envConfig.github.provider = undefined;
-        envConfig.github.url = undefined;
+        envConfig.source.provider = undefined;
+        envConfig.source.url = undefined;
       }
       if (locks.destination.locked && hasDestinationChanged(stored.giteaConfig?.url, envConfig.gitea.url)) {
         console.warn(
@@ -312,41 +288,42 @@ export async function initializeConfigFromEnv(): Promise<void> {
 
     // Determine mirror strategy based on environment variables or use explicit value
     let mirrorStrategy: 'preserve' | 'single-org' | 'flat-user' | 'mixed' = 'preserve';
-    if (envConfig.github.mirrorStrategy) {
-      mirrorStrategy = envConfig.github.mirrorStrategy;
-    } else if (envConfig.github.preserveOrgStructure === false && envConfig.gitea.organization) {
+    if (envConfig.source.mirrorStrategy) {
+      mirrorStrategy = envConfig.source.mirrorStrategy;
+    } else if (envConfig.source.preserveOrgStructure === false && envConfig.gitea.organization) {
       mirrorStrategy = 'single-org';
-    } else if (envConfig.github.preserveOrgStructure === true) {
+    } else if (envConfig.source.preserveOrgStructure === true) {
       mirrorStrategy = 'preserve';
     }
 
-    // Build GitHub config
-    const githubConfig = {
-      owner: envConfig.github.username || existingConfig?.[0]?.githubConfig?.owner || '',
-      type: envConfig.github.type || existingConfig?.[0]?.githubConfig?.type || 'personal',
-      provider: envConfig.github.provider || existingConfig?.[0]?.githubConfig?.provider || 'github',
-      url: envConfig.github.url || existingConfig?.[0]?.githubConfig?.url || undefined,
-      token: envConfig.github.token ? encrypt(envConfig.github.token) : existingConfig?.[0]?.githubConfig?.token || '',
-      includeStarred: envConfig.github.mirrorStarred ?? existingConfig?.[0]?.githubConfig?.includeStarred ?? false,
-      includeForks: !(envConfig.github.skipForks ?? false),
-      skipForks: envConfig.github.skipForks ?? existingConfig?.[0]?.githubConfig?.skipForks ?? false,
-      includeArchived: envConfig.github.includeArchived ?? existingConfig?.[0]?.githubConfig?.includeArchived ?? false,
-      includePrivate: envConfig.github.privateRepositories ?? existingConfig?.[0]?.githubConfig?.includePrivate ?? false,
-      includePublic: envConfig.github.publicRepositories ?? existingConfig?.[0]?.githubConfig?.includePublic ?? true,
-      includeCollaboratorRepos: envConfig.github.includeCollaboratorRepos ?? existingConfig?.[0]?.githubConfig?.includeCollaboratorRepos ?? true,
+    const sourceConfig = {
+      owner: envConfig.source.username || existingConfig?.[0]?.sourceConfig?.owner || '',
+      type: envConfig.source.type || existingConfig?.[0]?.sourceConfig?.type || 'personal',
+      provider: envConfig.source.provider || existingConfig?.[0]?.sourceConfig?.provider || 'huggingface',
+      url: envConfig.source.url || existingConfig?.[0]?.sourceConfig?.url || undefined,
+      token: envConfig.source.token ? encrypt(envConfig.source.token) : existingConfig?.[0]?.sourceConfig?.token || '',
+      repoTypes: existingConfig?.[0]?.sourceConfig?.repoTypes ?? ["model", "dataset", "space"],
+      collections: existingConfig?.[0]?.sourceConfig?.collections ?? [],
+      includeStarred: envConfig.source.mirrorStarred ?? existingConfig?.[0]?.sourceConfig?.includeStarred ?? false,
+      includeForks: !(envConfig.source.skipForks ?? false),
+      skipForks: envConfig.source.skipForks ?? existingConfig?.[0]?.sourceConfig?.skipForks ?? false,
+      includeArchived: envConfig.source.includeArchived ?? existingConfig?.[0]?.sourceConfig?.includeArchived ?? false,
+      includePrivate: envConfig.source.privateRepositories ?? existingConfig?.[0]?.sourceConfig?.includePrivate ?? false,
+      includePublic: envConfig.source.publicRepositories ?? existingConfig?.[0]?.sourceConfig?.includePublic ?? true,
+      includeCollaboratorRepos: envConfig.source.includeCollaboratorRepos ?? existingConfig?.[0]?.sourceConfig?.includeCollaboratorRepos ?? true,
       // Opt-in org allowlist from INCLUDE_ORGANIZATIONS (comma-separated). Falls
       // back to existing config so the UI-managed list isn't clobbered on restart.
-      includeOrganizations: envConfig.github.includeOrganizations ?? existingConfig?.[0]?.githubConfig?.includeOrganizations ?? [],
-      starredReposOrg: envConfig.github.starredReposOrg || existingConfig?.[0]?.githubConfig?.starredReposOrg || 'starred',
-      starredReposMode: envConfig.github.starredReposMode || existingConfig?.[0]?.githubConfig?.starredReposMode || 'dedicated-org',
-      starredDuplicateStrategy: envConfig.github.starredDuplicateStrategy || existingConfig?.[0]?.githubConfig?.starredDuplicateStrategy || 'suffix',
+      includeOrganizations: envConfig.source.includeOrganizations ?? existingConfig?.[0]?.sourceConfig?.includeOrganizations ?? [],
+      starredReposOrg: envConfig.source.starredReposOrg || existingConfig?.[0]?.sourceConfig?.starredReposOrg || 'starred',
+      starredReposMode: envConfig.source.starredReposMode || existingConfig?.[0]?.sourceConfig?.starredReposMode || 'dedicated-org',
+      starredDuplicateStrategy: envConfig.source.starredDuplicateStrategy || existingConfig?.[0]?.sourceConfig?.starredDuplicateStrategy || 'suffix',
       mirrorStrategy,
-      defaultOrg: envConfig.gitea.organization || existingConfig?.[0]?.githubConfig?.defaultOrg || 'github-mirrors',
-      starredCodeOnly: envConfig.github.starredCodeOnly ?? existingConfig?.[0]?.githubConfig?.starredCodeOnly ?? false,
-      autoMirrorStarred: envConfig.github.autoMirrorStarred ?? existingConfig?.[0]?.githubConfig?.autoMirrorStarred ?? false,
-      starredLists: envConfig.github.starredLists ?? existingConfig?.[0]?.githubConfig?.starredLists ?? [],
+      defaultOrg: envConfig.gitea.organization || existingConfig?.[0]?.sourceConfig?.defaultOrg || 'hf-mirrors',
+      starredCodeOnly: envConfig.source.starredCodeOnly ?? existingConfig?.[0]?.sourceConfig?.starredCodeOnly ?? false,
+      autoMirrorStarred: envConfig.source.autoMirrorStarred ?? existingConfig?.[0]?.sourceConfig?.autoMirrorStarred ?? false,
+      starredLists: envConfig.source.starredLists ?? existingConfig?.[0]?.sourceConfig?.starredLists ?? [],
       // ONLY_MIRROR_ORGS=true maps to skipPersonalRepos: true
-      skipPersonalRepos: envConfig.github.onlyMirrorOrgs ?? existingConfig?.[0]?.githubConfig?.skipPersonalRepos ?? false,
+      skipPersonalRepos: envConfig.source.onlyMirrorOrgs ?? existingConfig?.[0]?.sourceConfig?.skipPersonalRepos ?? false,
     };
 
     // Build Gitea config
@@ -354,7 +331,7 @@ export async function initializeConfigFromEnv(): Promise<void> {
       url:
         envConfig.gitea.url ||
         existingConfig?.[0]?.giteaConfig?.url ||
-        // GitHub and GitLab targets default to their public instance.
+
         DESTINATION_PROVIDER_DEFAULT_URLS[envConfig.gitea.provider || existingConfig?.[0]?.giteaConfig?.provider || 'gitea'] ||
         '',
       provider: envConfig.gitea.provider || existingConfig?.[0]?.giteaConfig?.provider || 'gitea',
@@ -432,14 +409,7 @@ export async function initializeConfigFromEnv(): Promise<void> {
     // Build cleanup config
     const cleanupConfig = {
       enabled: envConfig.cleanup.enabled ?? existingConfig?.[0]?.cleanupConfig?.enabled ?? false,
-      retentionDays: envConfig.cleanup.retentionDays ? envConfig.cleanup.retentionDays * 86400 : existingConfig?.[0]?.cleanupConfig?.retentionDays ?? 604800, // Convert days to seconds
-      deleteFromGitea: envConfig.cleanup.deleteFromGitea ?? existingConfig?.[0]?.cleanupConfig?.deleteFromGitea ?? false,
-      deleteIfNotInGitHub: envConfig.cleanup.deleteIfNotInGitHub ?? existingConfig?.[0]?.cleanupConfig?.deleteIfNotInGitHub ?? true,
-      protectedRepos: envConfig.cleanup.protectedRepos ?? existingConfig?.[0]?.cleanupConfig?.protectedRepos ?? [],
-      dryRun: envConfig.cleanup.dryRun ?? existingConfig?.[0]?.cleanupConfig?.dryRun ?? true,
-      orphanedRepoAction: envConfig.cleanup.orphanedRepoAction || existingConfig?.[0]?.cleanupConfig?.orphanedRepoAction || 'archive',
-      batchSize: envConfig.cleanup.batchSize ?? existingConfig?.[0]?.cleanupConfig?.batchSize ?? 10,
-      pauseBetweenDeletes: envConfig.cleanup.pauseBetweenDeletes ?? existingConfig?.[0]?.cleanupConfig?.pauseBetweenDeletes ?? 2000,
+      retentionDays: envConfig.cleanup.retentionDays ? envConfig.cleanup.retentionDays * 86400 : existingConfig?.[0]?.cleanupConfig?.retentionDays ?? 604800,
       lastRun: existingConfig?.[0]?.cleanupConfig?.lastRun || undefined,
       nextRun: existingConfig?.[0]?.cleanupConfig?.nextRun || undefined,
     };
@@ -450,7 +420,7 @@ export async function initializeConfigFromEnv(): Promise<void> {
       await db
         .update(configs)
         .set({
-          githubConfig,
+          sourceConfig,
           giteaConfig,
           scheduleConfig,
           cleanupConfig,
@@ -466,7 +436,7 @@ export async function initializeConfigFromEnv(): Promise<void> {
         userId,
         name: 'Environment Configuration',
         isActive: true,
-        githubConfig,
+        sourceConfig,
         giteaConfig,
         include: [],
         exclude: [],
@@ -490,7 +460,7 @@ export async function initializeConfigFromEnv(): Promise<void> {
  * Keep the user's first (primary) source row in sync with the environment
  * connection variables. The sources table is authoritative for connections;
  * createSource/updateSource mirror the primary source back into the config's
- * githubConfig connection fields (write-through). Never clears values the
+ * sourceConfig connection fields (write-through). Never clears values the
  * env did not set.
  */
 async function syncFirstSourceFromEnv(userId: string, envConfig: EnvConfig): Promise<void> {
@@ -501,12 +471,12 @@ async function syncFirstSourceFromEnv(userId: string, envConfig: EnvConfig): Pro
     if (existingSources.length === 0) {
       // Only mint a source row when the environment actually carries a
       // connection; preference-only envs must not create an empty source.
-      if (envConfig.github.token || envConfig.github.username) {
+      if (envConfig.source.token || envConfig.source.username) {
         await createSource(userId, {
-          provider: envConfig.github.provider ?? 'github',
-          url: envConfig.github.url,
-          username: envConfig.github.username ?? '',
-          token: envConfig.github.token ?? '',
+          provider: envConfig.source.provider ?? 'source',
+          url: envConfig.source.url,
+          username: envConfig.source.username ?? '',
+          token: envConfig.source.token ?? '',
         });
         console.log('[ENV Config Loader] Created the primary source from environment variables');
       }
@@ -516,25 +486,25 @@ async function syncFirstSourceFromEnv(userId: string, envConfig: EnvConfig): Pro
     const primary = existingSources[0];
 
     const updates: SourceUpdateInput = {};
-    if (envConfig.github.provider !== undefined) {
-      updates.provider = envConfig.github.provider;
+    if (envConfig.source.provider !== undefined) {
+      updates.provider = envConfig.source.provider;
     }
-    if (envConfig.github.url !== undefined) {
-      updates.url = envConfig.github.url;
+    if (envConfig.source.url !== undefined) {
+      updates.url = envConfig.source.url;
     }
-    if (envConfig.github.username !== undefined) {
-      updates.username = envConfig.github.username;
+    if (envConfig.source.username !== undefined) {
+      updates.username = envConfig.source.username;
     }
-    if (envConfig.github.token) {
-      updates.token = envConfig.github.token;
+    if (envConfig.source.token) {
+      updates.token = envConfig.source.token;
     }
 
     // A source with imported repositories is locked: environment variables
-    // cannot switch its host, mirroring the githubConfig check above.
+    // cannot switch its host, mirroring the sourceConfig check above.
     const sourceRepoCount = await countRepositoriesForSource(userId, primary.id);
     const incomingSource = {
-      provider: envConfig.github.provider ?? primary.provider,
-      url: envConfig.github.url ?? primary.url,
+      provider: envConfig.source.provider ?? primary.provider,
+      url: envConfig.source.url ?? primary.url,
     };
     const lockedHostChange =
       sourceRepoCount > 0 &&

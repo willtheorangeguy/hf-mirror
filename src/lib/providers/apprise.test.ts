@@ -1,12 +1,16 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import { sendAppriseNotification } from "./apprise";
 import type { NotificationEvent } from "./ntfy";
 import type { AppriseConfig } from "@/types/config";
 
 describe("sendAppriseNotification", () => {
   let mockFetch: ReturnType<typeof mock>;
+  let originalFetch: typeof fetch;
+
+  afterEach(() => { globalThis.fetch = originalFetch; });
 
   beforeEach(() => {
+    originalFetch = globalThis.fetch;
     mockFetch = mock(() =>
       Promise.resolve(new Response("ok", { status: 200 }))
     );
@@ -15,7 +19,7 @@ describe("sendAppriseNotification", () => {
 
   const baseConfig: AppriseConfig = {
     url: "http://apprise:8000",
-    token: "gitea-mirror",
+    token: "hf-mirror",
   };
 
   const baseEvent: NotificationEvent = {
@@ -29,7 +33,7 @@ describe("sendAppriseNotification", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toBe("http://apprise:8000/notify/gitea-mirror");
+    expect(url).toBe("http://apprise:8000/notify/hf-mirror");
   });
 
   test("strips trailing slash from URL", async () => {
@@ -39,7 +43,7 @@ describe("sendAppriseNotification", () => {
     );
 
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toBe("http://apprise:8000/notify/gitea-mirror");
+    expect(url).toBe("http://apprise:8000/notify/hf-mirror");
   });
 
   test("sends correct JSON body format", async () => {
@@ -91,7 +95,7 @@ describe("sendAppriseNotification", () => {
     );
     globalThis.fetch = mockFetch as any;
 
-    expect(
+    await expect(
       sendAppriseNotification(baseConfig, baseEvent)
     ).rejects.toThrow("Apprise error: 500");
   });

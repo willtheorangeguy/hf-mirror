@@ -3,7 +3,7 @@ import { SourceIcon, repositorySourceInfo } from "@/components/source/SourceIcon
 import { DestinationIcon, destinationInfo } from "@/components/destination/DestinationIcon";
 import { Button } from "@/components/ui/button";
 import { GitFork } from "lucide-react";
-import { SiGithub } from "react-icons/si";
+
 import type { Repository } from "@/lib/db/schema";
 import { buildGiteaWebUrl } from "@/lib/gitea-url";
 import { useGiteaConfig } from "@/hooks/useGiteaConfig";
@@ -48,7 +48,7 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
           <GitFork className="h-5 w-5 text-muted-foreground" />
           Repositories
         </CardTitle>
-        <Button variant="ghost" size="sm" asChild className="text-indigo-500 hover:text-indigo-600">
+        <Button variant="ghost" size="sm" asChild className="text-primary hover:text-indigo-600">
           <a href={withBase("/repositories")}>View all</a>
         </Button>
       </CardHeader>
@@ -58,10 +58,10 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
             <GitFork className="h-10 w-10 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium">No repositories found</h3>
             <p className="text-sm text-muted-foreground mt-1 mb-4">
-              Configure your GitHub connection to start mirroring repositories.
+              Configure your Hugging Face connection to start mirroring repositories.
             </p>
             <Button asChild>
-              <a href={withBase("/config")}>Configure GitHub</a>
+              <a href={withBase("/config")}>Configure Hugging Face</a>
             </Button>
           </div>
         ) : (

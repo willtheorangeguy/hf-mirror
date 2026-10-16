@@ -16,7 +16,7 @@ export interface OrganizationSourceInfo {
   sourceUrl: string;
   /** Full provider label, for tooltips. */
   label: string;
-  /** Shorter label for buttons: Gitea and Forgejo sources both read "Gitea". */
+  /** Source label for buttons. */
   shortLabel: string;
 }
 
@@ -41,7 +41,7 @@ export function resolveOrganizationSource(
       ? normalizeSourceUrl(pinnedSource.url, pinnedSource.provider)
       : fallbackUrl,
     label,
-    shortLabel: provider === "gitea" ? "Gitea" : label,
+    shortLabel: label,
   };
 }
 

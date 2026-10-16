@@ -45,7 +45,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
           <Activity className="h-5 w-5 text-muted-foreground" />
           Recent Activity
         </CardTitle>
-        <Button variant="ghost" size="sm" asChild className="text-indigo-500 hover:text-indigo-600">
+        <Button variant="ghost" size="sm" asChild className="text-primary hover:text-indigo-600">
           <a href={withBase("/activity")}>View all</a>
         </Button>
       </CardHeader>

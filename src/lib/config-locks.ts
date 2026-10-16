@@ -48,12 +48,6 @@ export const UNLOCKED_CONFIG: ConfigLockState = computeConfigLocks({
   mirroredCount: 0,
 });
 
-/**
- * The host a source config points at, normalized so cosmetic edits do not
- * count as a change. An empty or missing URL resolves to the provider's
- * default instance; a custom GitHub Enterprise URL is preserved so host
- * switches on locked sources still need confirmation.
- */
 export function sourceIdentity(config: SourceLike | null | undefined): SourceIdentity {
   const provider = normalizeSourceProviderKind(config?.provider);
   return {

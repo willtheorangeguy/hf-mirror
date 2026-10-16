@@ -118,7 +118,7 @@ export async function rediscoverRepositoriesForOrganization({
   );
 
   const sourceProvider = createSourceProviderFromSource(source, { userId });
-  const orgRepos = await sourceProvider.listOrganizationRepositories(organization.name);
+  const orgRepos = await sourceProvider.listOrganizationRepositories(organization.name, config.sourceConfig?.repoTypes);
 
   // The organization's fork policy (override -> global skipForks), the same
   // resolution the organization mirror path applies.

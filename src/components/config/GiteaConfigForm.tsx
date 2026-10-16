@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Activity, AlertTriangle, Building2, Info, PlugZap, UploadCloud } from "lucide-react";
-import { SiForgejo, SiGitea, SiGithub, SiGitlab } from "react-icons/si";
+import { Activity, Building2, Info, PlugZap } from "lucide-react";
+import { SiForgejo, SiGitea } from "react-icons/si";
 import {
   Select,
   SelectContent,
@@ -10,14 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DESTINATION_PROVIDER_DEFAULT_URLS,
-  DESTINATION_PROVIDER_LABELS,
-  DESTINATION_PROVIDER_ORG_NOUNS,
-  PUSH_DESTINATION_TOKEN_SCOPES,
-  isPushDestinationKind,
-  isBetaDestinationProvider,
-} from "@/lib/destination-kinds";
+import { DESTINATION_PROVIDER_DEFAULT_URLS, DESTINATION_PROVIDER_LABELS, DESTINATION_PROVIDER_ORG_NOUNS, isBetaDestinationProvider } from "@/lib/destination-kinds";
 import { HostLockNotice } from "./HostLockNotice";
 import { giteaApi, type GiteaServerInfo } from "@/lib/api";
 import type {
@@ -46,7 +38,7 @@ interface GiteaConfigFormProps {
     options?: { confirmDestinationChange?: boolean }
   ) => Promise<void>;
   isAutoSaving?: boolean;
-  githubUsername?: string;
+  sourceUsername?: string;
   /** Set once repositories were mirrored: the destination can only change with confirmation. */
   destinationLock?: ConfigLockState["destination"];
   /** Which card to render: the connection card or the organization card. */
@@ -60,16 +52,14 @@ const destinationProviders: {
   /** Short pill shown next to the option, e.g. BETA. */
   badge?: string;
 }[] = [
-  { value: "gitea", label: DESTINATION_PROVIDER_LABELS.gitea, icon: SiGitea },
-  { value: "forgejo", label: DESTINATION_PROVIDER_LABELS.forgejo, icon: SiForgejo },
-  { value: "github", label: DESTINATION_PROVIDER_LABELS.github, icon: SiGithub },
-  { value: "gitlab", label: DESTINATION_PROVIDER_LABELS.gitlab, icon: SiGitlab },
+  { value: "gitea" as const, label: DESTINATION_PROVIDER_LABELS.gitea, icon: SiGitea },
+  { value: "forgejo" as const, label: DESTINATION_PROVIDER_LABELS.forgejo, icon: SiForgejo },
 ].map((option) => ({ ...option, badge: isBetaDestinationProvider(option.value) ? "BETA" : undefined }));
 
 /** The public instance URLs a hosted target is prefilled with. */
 const HOSTED_DEFAULT_URLS = new Set(Object.values(DESTINATION_PROVIDER_DEFAULT_URLS));
 
-export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, githubUsername, destinationLock, part = "connection" }: GiteaConfigFormProps) {
+export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, sourceUsername, destinationLock, part = "connection" }: GiteaConfigFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [destinationUnlocked, setDestinationUnlocked] = useState(false);
   const destinationLocked = Boolean(destinationLock?.locked) && !destinationUnlocked;
@@ -77,7 +67,6 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
   const providerMeta =
     destinationProviders.find((option) => option.value === provider) ?? destinationProviders[0];
   const providerLabel = providerMeta.label;
-  const isPushTarget = isPushDestinationKind(provider);
   const orgNoun = DESTINATION_PROVIDER_ORG_NOUNS[provider];
 
   const handleProviderChange = (value: string) => {
@@ -127,8 +116,8 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
         newConfig.preserveOrgStructure = false;
         newConfig.mirrorStrategy = "single-org";
         // Reset to default if coming from mixed mode where it was personal repos org
-        if (config.mirrorStrategy === "mixed" || !newConfig.organization || newConfig.organization === "github-personal") {
-          newConfig.organization = "github-mirrors";
+        if (config.mirrorStrategy === "mixed" || !newConfig.organization || newConfig.organization === "hf-personal") {
+          newConfig.organization = "hf-mirrors";
         }
         break;
       case "flat-user":
@@ -141,11 +130,11 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
         newConfig.mirrorStrategy = "mixed";
         // In mixed mode, organization field represents personal repos org
         // Reset it to default if coming from single-org mode
-        if (config.mirrorStrategy === "single-org" || !newConfig.organization || newConfig.organization === "github-mirrors") {
-          newConfig.organization = "github-personal";
+        if (config.mirrorStrategy === "single-org" || !newConfig.organization || newConfig.organization === "hf-mirrors") {
+          newConfig.organization = "hf-personal";
         }
         if (!newConfig.personalReposOrg) {
-          newConfig.personalReposOrg = "github-personal";
+          newConfig.personalReposOrg = "hf-personal";
         }
         break;
     }
@@ -196,7 +185,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
   };
 
   const testConnection = async () => {
-    if (!config.token || (!isPushTarget && !config.url)) {
+    if (!config.token || (!config.url)) {
       toast.error(`${providerLabel} URL and token are required to test the connection`);
       return;
     }
@@ -206,7 +195,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
     try {
       const result = await giteaApi.testConnection(config.url, config.token, {
         provider,
-        username: isPushTarget ? config.username : undefined,
+        username: config.username,
       });
       if (result.success) {
         setServerInfo(result.serverInfo ?? null);
@@ -228,9 +217,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
   };
 
   const serverInfoLabel = (info: GiteaServerInfo): string => {
-    if (info.type === "github" || info.type === "gitlab") {
-      return `Connected to ${info.version}`;
-    }
+
     return `${info.type === "forgejo" ? "Forgejo" : "Gitea"} ${info.version} detected`;
   };
 
@@ -249,7 +236,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
               variant="outline"
               size="sm"
               onClick={testConnection}
-              disabled={isLoading || !config.token || (!isPushTarget && !config.url)}
+              disabled={isLoading || !config.token || (!config.url)}
             >
               <PlugZap className="mr-1.5 h-3.5 w-3.5" />
               {isLoading ? "Testing..." : "Test"}
@@ -263,32 +250,6 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
         }
       >
         <CardSection>
-          {serverInfo?.type === "forgejo" && serverInfo.hasMirrorCredBug && (
-            <Alert variant="warning">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>
-                Forgejo {serverInfo.version} has a known mirror-credential bug
-              </AlertTitle>
-              <AlertDescription>
-                <p>
-                  Pull-mirror credentials sent via Forgejo's migrate API aren't persisted on this version, so subsequent syncs of private repos fail with <code className="text-xs font-mono bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">terminal prompts disabled</code>. Fixed in Forgejo 15.0.0 (
-                  <a
-                    href="https://codeberg.org/forgejo/forgejo/pulls/11909"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline underline-offset-2"
-                  >
-                    PR #11909
-                  </a>
-                  ).
-                </p>
-                <p>
-                  Upgrade Forgejo to 15.0.0 or later, then delete and re-mirror affected repos — or open each repo's Settings → Mirror Settings in Forgejo and re-enter the GitHub token once.
-                </p>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="space-y-1.5">
             <Label
               htmlFor="destination-provider"
@@ -317,9 +278,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground/80">
-              {isPushTarget
-                ? `${providerLabel} has no pull mirror API, so this app keeps a bare clone of each source repository and pushes its branches and tags there.`
-                : provider === "forgejo"
+              {provider === "forgejo"
                   ? "Beta. Where mirrors are created. Forgejo shares Gitea's API, so everything Gitea supports works here."
                   : "Where mirrors are created."}
             </p>
@@ -341,26 +300,14 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
             )}
           </div>
 
-          {isPushTarget && (
-            <Alert>
-              <UploadCloud className="h-4 w-4" />
-              <AlertTitle>Push target (beta)</AlertTitle>
-              <AlertDescription>
-                <p>
-                  Branches and tags are pushed with force and prune, so the {providerLabel} copy always matches the
-                  source and is overwritten on every sync. Issues, pull requests, releases, wiki and LFS objects are
-                  not mirrored. Bare clones live in the data directory next to the database.
-                </p>
-              </AlertDescription>
-            </Alert>
-          )}
+          {false}
 
           <div className="space-y-1.5">
             <Label
               htmlFor="gitea-username"
               className="text-xs font-medium text-muted-foreground"
             >
-              {isPushTarget ? "Account" : "Username"}
+              {"Username"}
             </Label>
             <Input
               id="gitea-username"
@@ -371,11 +318,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
               placeholder={`Your ${providerLabel} username`}
               required
             />
-            {isPushTarget && (
-              <p className="text-[11px] text-muted-foreground/80">
-                {`The user the token belongs to. Repositories go under this account, or under the ${orgNoun} the mirror strategy picks.`}
-              </p>
-            )}
+            {false}
           </div>
 
           <div className="space-y-1.5">
@@ -383,7 +326,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
               htmlFor="gitea-url"
               className="text-xs font-medium text-muted-foreground"
             >
-              {isPushTarget ? "Instance URL" : "Server URL"}
+              {"Server URL"}
             </Label>
             <Input
               id="gitea-url"
@@ -395,19 +338,12 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
                 DESTINATION_PROVIDER_DEFAULT_URLS[provider] ?? `https://your-${provider}-instance.com`
               }
               disabled={destinationLocked}
-              required={!isPushTarget}
+              required
             />
-            {isPushTarget && (
-              <p className="text-[11px] text-muted-foreground/80">
-                {provider === "github"
-                  ? "github.com, or the URL of your GitHub Enterprise Server"
-                  : "gitlab.com, or the URL of your self hosted GitLab"}
-              </p>
-            )}
+            {false}
           </div>
 
-          {!isPushTarget && (
-            <div className="space-y-1.5">
+          {<div className="space-y-1.5">
               <Label
                 htmlFor="gitea-external-url"
                 className="text-xs font-medium text-muted-foreground"
@@ -425,8 +361,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
               <p className="text-[11px] text-muted-foreground/80">
                 Dashboard links only, syncing always uses the server URL
               </p>
-            </div>
-          )}
+            </div>}
 
           <div className="space-y-1.5">
             <Label
@@ -445,13 +380,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
               required
             />
             <p className="text-[11px] text-muted-foreground/80">
-              {isPushTarget
-                ? `A personal access token with the scopes ${PUSH_DESTINATION_TOKEN_SCOPES[provider].join(", ")}. ${
-                    provider === "github"
-                      ? "GitHub rejects pushes that add workflow files unless the token has the workflow scope."
-                      : "Groups the token cannot see are created as new top level groups."
-                  }`
-                : `Create one in ${providerLabel} under Settings → Applications`}
+              {`Create one in ${providerLabel} under Settings → Applications`}
             </p>
           </div>
         </CardSection>
@@ -479,7 +408,7 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, g
             starredReposOrg={config.starredReposOrg}
             starredReposMode={config.starredReposMode}
             onStrategyChange={setMirrorStrategy}
-            githubUsername={githubUsername}
+            sourceUsername={sourceUsername}
             giteaUsername={config.username}
           />
         </CardSection>

@@ -241,7 +241,7 @@ export function ReconcileDialog({ open, onOpenChange }: ReconcileDialogProps) {
             />
             {report.notManaged.length > 0 && (
               <RepoList
-                title="Not managed by gitea-mirror"
+                title="Not managed by hf-mirror"
                 items={report.notManaged.map((r) => `${r.location} (${r.reason})`)}
                 hint="Native repositories, mirrors of other hosts, and second copies of a tracked mirror. These are listed for information and never touched."
               />

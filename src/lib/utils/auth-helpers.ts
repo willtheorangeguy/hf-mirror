@@ -1,4 +1,4 @@
-import type { APIRoute, APIContext } from "astro";
+import type { APIContext } from "astro";
 import { auth } from "@/lib/auth";
 
 /**
@@ -11,7 +11,7 @@ export async function getAuthenticatedUser(request: Request) {
     const session = await auth.api.getSession({
       headers: request.headers,
     });
-    
+
     return session ? session.user : null;
   } catch (error) {
     console.error("Error getting session:", error);
@@ -27,7 +27,7 @@ export async function getAuthenticatedUser(request: Request) {
  */
 export async function requireAuth(context: APIContext) {
   const user = await getAuthenticatedUser(context.request);
-  
+
   if (!user) {
     return {
       user: null,
@@ -43,7 +43,7 @@ export async function requireAuth(context: APIContext) {
       ),
     };
   }
-  
+
   return { user, response: null };
 }
 

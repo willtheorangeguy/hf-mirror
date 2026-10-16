@@ -63,7 +63,7 @@ export function InlineDestinationEditor({
 
   // Determine the default destination based on repository properties and config
   const getDefaultDestination = () => {
-    // Starred repos can use either dedicated org or preserved source owner
+    // Liked repos can use either dedicated org or preserved source owner
     if (repository.isStarred) {
       const starredReposMode = giteaConfig?.starredReposMode || "dedicated-org";
       if (starredReposMode === "preserve-owner") {
@@ -74,7 +74,7 @@ export function InlineDestinationEditor({
       }
       return "starred";
     }
-    
+
     // An organization's own override applies to its repositories whatever the
     // strategy says, matching getGiteaRepoOwnerAsync's precedence (#416).
     if (repository.organization && organizationDestination) {
@@ -83,7 +83,7 @@ export function InlineDestinationEditor({
 
     // Check mirror strategy
     const strategy = giteaConfig?.mirrorStrategy || 'preserve';
-    
+
     if (strategy === 'single-org' && giteaConfig?.organization) {
       // All repos go to a single organization
       return giteaConfig.organization;
@@ -116,7 +116,7 @@ export function InlineDestinationEditor({
   const mirrorLocation = (repository.mirroredLocation ?? "").trim();
   const mirrorOwner = mirrorLocation.includes("/") ? mirrorLocation.slice(0, mirrorLocation.indexOf("/")) : "";
   // A mirror that exists on a Gitea or Forgejo destination can move along with the label.
-  const canMove = mirrorOwner !== "" && !destination.isPushTarget && !CANNOT_MOVE_STATUSES.has(repository.status);
+  const canMove = mirrorOwner !== "" && !!destination.canTransfer && !CANNOT_MOVE_STATUSES.has(repository.status);
   // The label names one owner while the mirror sits under another: what issue #400 ran into.
   const labelDisagrees =
     Boolean(repository.destinationOrg) &&
@@ -290,13 +290,13 @@ export function InlineDestinationEditor({
   return (
     <>
       <div className={cn("flex flex-col gap-0.5", className)}>
-        {/* Show GitHub org if exists */}
+        {/* Show Hugging Face org if exists */}
         {repository.organization && (
           <span className="text-xs text-muted-foreground">
             {repository.organization}
           </span>
         )}
-        
+
         {/* Show Gitea destination */}
         <div className="flex items-center gap-1 group">
           <span className="text-sm">

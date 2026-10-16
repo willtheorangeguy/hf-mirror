@@ -57,8 +57,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
     const provider = body.provider;
 
-    // GitLab and Gitea sources point at an instance; GitHub needs no URL.
-    if (provider !== "github") {
+    {
       const rawSourceUrl = typeof body.url === "string" ? body.url.trim() : "";
       if (rawSourceUrl && !isValidSourceUrl(rawSourceUrl)) {
         return new Response(

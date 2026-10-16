@@ -17,9 +17,8 @@ pnpm-debug.log*
 .env
 .env.production
 
-# runtime data (database, repo backups); keep the README
+# Runtime database and repository backups
 data/*
-!data/README.md
 
 # macOS-specific files
 .DS_Store
@@ -27,25 +26,14 @@ data/*
 # jetbrains setting folder
 .idea/
 
-# Custom CA certificates (exclude actual certs but keep README)
+# Custom CA certificates
 certs/*.crt
 certs/*.pem
 certs/*.cer
-!certs/README.md
-
-# Nix build artifacts
-result
-result-*
-.direnv/
 
 # E2E test artifacts
 tests/e2e/test-results/
 tests/e2e/playwright-report/
-tests/e2e/.auth/
-tests/e2e/e2e-storage-state.json
-tests/e2e/.fake-github.pid
-tests/e2e/.app.pid
-tests/e2e/git-repos/
 
 # Playwright
 /test-results/
@@ -54,3 +42,7 @@ tests/e2e/git-repos/
 /playwright/.cache/
 /playwright/.auth/
 .playwright-mcp/
+
+# Local HF-mirror validation artifacts
+.hf-*.log
+.cache/

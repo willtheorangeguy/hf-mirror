@@ -4,7 +4,7 @@
 - `src/` – app code
   - `components/` (React, PascalCase files), `pages/` (Astro/API routes), `lib/` (domain + utilities, kebab-case), `hooks/`, `layouts/`, `styles/`, `tests/`, `types/`, `data/`, `content/`.
 - `scripts/` – operational TS scripts (DB init, recovery): e.g., `scripts/manage-db.ts`.
-- `drizzle/` – SQL migrations; `data/` – runtime SQLite (`gitea-mirror.db`).
+- `drizzle/` – SQL migrations; `data/` – runtime SQLite (`hf-mirror.db`).
 - `public/` – static assets; `dist/` – build output.
 - Key config: `astro.config.mjs`, `tsconfig.json` (alias `@/* → src/*`), `bunfig.toml` (test preload), `.env(.example)`.
 
@@ -22,7 +22,7 @@
 - Language: TypeScript, Astro, React.
 - Indentation: 2 spaces; keep existing semicolon/quote style in touched files.
 - Components: PascalCase `.tsx` in `src/components/` (e.g., `MainLayout.tsx`).
-- Modules/utils: kebab-case in `src/lib/` (e.g., `gitea-enhanced.ts`).
+- Modules/utils: kebab-case in `src/lib/` (e.g., `hf-transfer.ts`).
 - Imports: prefer alias `@/…` (configured in `tsconfig.json`).
 - Do not introduce new lint/format configs; follow current patterns.
 
@@ -38,7 +38,7 @@
   - Summary, rationale, and testing steps/commands.
   - Linked issues (e.g., `Closes #123`).
   - Screenshots/gifs for UI changes.
-  - Notes on DB/migration or .env impacts; update `docs/`/CHANGELOG if applicable.
+  - Notes on DB/migration or .env impacts; describe configuration impacts in the change summary.
 
 ## Security & Configuration Tips
 - Never commit secrets. Copy `.env.example` → `.env` and fill values; prefer `bun run startup-env-config` to validate.

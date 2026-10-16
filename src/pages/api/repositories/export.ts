@@ -49,7 +49,7 @@ export const REPOSITORY_EXPORT_COLUMNS = Object.keys(
 ) as (keyof typeof repositoryExportSelection)[];
 
 export function repositoryExportFilename(now: Date): string {
-  return `gitea-mirror-repositories-${now.toISOString().slice(0, 10)}.csv`;
+  return `hf-mirror-repositories-${now.toISOString().slice(0, 10)}.csv`;
 }
 
 export const GET: APIRoute = async ({ request, locals }) => {

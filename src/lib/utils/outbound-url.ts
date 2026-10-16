@@ -1,7 +1,7 @@
 /**
  * Guard for outbound requests to user supplied URLs.
  *
- * Gitea Mirror talks to hosts on private networks by design: the Gitea it
+ * HF-mirror talks to hosts on private networks by design: the Gitea it
  * mirrors to usually lives on a LAN address, a Docker service name or
  * localhost, and so do ntfy and Gotify. Blocking private ranges would break
  * the normal deployment, so this guard is deliberately narrow. It refuses

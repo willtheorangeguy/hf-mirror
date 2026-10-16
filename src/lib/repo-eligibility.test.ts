@@ -1,17 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import { isMirrorableGitHubRepo } from "@/lib/repo-eligibility";
+import { isMirrorableSourceRepository } from "@/lib/repo-eligibility";
 
-describe("isMirrorableGitHubRepo", () => {
+describe("isMirrorableSourceRepository", () => {
   it("returns false for disabled repos", () => {
-    expect(isMirrorableGitHubRepo({ isDisabled: true })).toBe(false);
+    expect(isMirrorableSourceRepository({ isDisabled: true })).toBe(false);
   });
 
   it("returns true for enabled repos", () => {
-    expect(isMirrorableGitHubRepo({ isDisabled: false })).toBe(true);
+    expect(isMirrorableSourceRepository({ isDisabled: false })).toBe(true);
   });
 
   it("returns true when disabled flag is absent", () => {
-    expect(isMirrorableGitHubRepo({})).toBe(true);
+    expect(isMirrorableSourceRepository({})).toBe(true);
   });
 });
-

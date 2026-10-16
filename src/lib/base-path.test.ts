@@ -15,14 +15,14 @@ async function loadModule(baseUrl?: string, runtimeWindowBasePath?: string) {
       delete (globalThis as { window?: unknown }).window;
     } else {
       (globalThis as { window?: unknown }).window = originalWindow;
-      const restoredWindow = (globalThis as { window?: { __GITEA_MIRROR_BASE_PATH__?: string } }).window;
+      const restoredWindow = (globalThis as { window?: { __HF_MIRROR_BASE_PATH__?: string } }).window;
       if (typeof restoredWindow === "object" && restoredWindow !== null) {
-        delete restoredWindow.__GITEA_MIRROR_BASE_PATH__;
+        delete restoredWindow.__HF_MIRROR_BASE_PATH__;
       }
     }
   } else {
-    (globalThis as { window?: { __GITEA_MIRROR_BASE_PATH__?: string } }).window = {
-      __GITEA_MIRROR_BASE_PATH__: runtimeWindowBasePath,
+    (globalThis as { window?: { __HF_MIRROR_BASE_PATH__?: string } }).window = {
+      __HF_MIRROR_BASE_PATH__: runtimeWindowBasePath,
     };
   }
 

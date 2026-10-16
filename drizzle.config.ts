@@ -5,7 +5,7 @@ export default defineConfig({
   schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: "./data/gitea-mirror.db",
+    url: "./data/hf-mirror.db",
   },
   verbose: true,
   strict: true,

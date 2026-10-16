@@ -21,7 +21,6 @@ import {
   type AuthMethod,
 } from '@/lib/utils/auth-method';
 
-
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -122,17 +121,17 @@ export function LoginForm() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img
-              src={withBase('/logo.png')}
-              alt="Gitea Mirror Logo"
+              src={withBase('/hf-mirror.svg')}
+              alt="HF-mirror Logo"
               className="h-8 w-10"
             />
           </div>
-          <CardTitle className="text-2xl">Gitea Mirror</CardTitle>
+          <CardTitle className="text-2xl">HF-mirror</CardTitle>
           <CardDescription>
-            Log in to manage your GitHub to Gitea mirroring
+            Log in to manage your Hugging Face to Gitea mirroring
           </CardDescription>
         </CardHeader>
-        
+
         {isLoadingMethods ? (
           <CardContent>
             <div className="flex justify-center py-8">
@@ -237,7 +236,7 @@ export function LoginForm() {
                               </Button>
                             ))}
                           </div>
-                          
+
                           <div className="relative">
                             <div className="absolute inset-0 flex items-center">
                               <Separator />
@@ -248,7 +247,7 @@ export function LoginForm() {
                           </div>
                         </>
                       )}
-                      
+
                       <div>
                         <label htmlFor="sso-email" className="block text-sm font-medium mb-1">
                           Work Email
@@ -269,8 +268,8 @@ export function LoginForm() {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       onClick={() => handleSSOLogin(undefined, undefined)}
                       disabled={isLoading || !ssoEmail}
                     >
@@ -325,7 +324,7 @@ export function LoginForm() {
             )}
           </>
         )}
-        
+
         <div className="px-6 pb-6 text-center">
           <p className="text-sm text-muted-foreground">
             Don't have an account? Contact your administrator.

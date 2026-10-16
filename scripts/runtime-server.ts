@@ -58,7 +58,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
   }
 
   req.url = rewrittenUrl;
-  req.headers["x-gitea-mirror-base-rewritten"] = "1";
+  req.headers["x-hf-mirror-base-rewritten"] = "1";
 
   Promise.resolve((handler as unknown as (request: IncomingMessage, response: ServerResponse) => unknown)(req, res)).catch((error) => {
     console.error("Unhandled runtime server error:", error);

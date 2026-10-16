@@ -1,3 +1,4 @@
+import { withBase } from "@/lib/base-path";
 import * as React from "react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,10 @@ import {
 } from "../ui/dialog";
 import { LoaderCircle, Plus } from "lucide-react";
 import {
-  parseGitHubRepoReference,
+  parseHFRepositoryReference,
   parseRepoReferenceParts,
   type RepoReferenceParts,
-} from "@/lib/utils/github-url";
+} from "@/lib/utils/hf-url";
 
 const inputClassName =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
@@ -34,6 +35,8 @@ interface AddRepositoryDialogProps {
     destinationOrg?: string;
     host?: string;
     path?: string[];
+    repoType?: "model" | "dataset" | "space";
+    sourceId?: string;
   }) => Promise<void>;
 }
 
@@ -42,6 +45,13 @@ export default function AddRepositoryDialog({
   setIsDialogOpen,
   onAddRepository,
 }: AddRepositoryDialogProps) {
+  const [repoType, setRepoType] = useState<"model" | "dataset" | "space">("model");
+  const [sourceId, setSourceId] = useState("");
+  const [sources, setSources] = useState<{ id: string; name: string; enabled: boolean }[]>([]);
+  useEffect(() => {
+    if (!isDialogOpen) return;
+    fetch(withBase("/api/sources")).then(response => response.json()).then(data => setSources((data.sources ?? []).filter((source: { enabled: boolean }) => source.enabled))).catch(() => setSources([]));
+  }, [isDialogOpen]);
   const [url, setUrl] = useState<string>("");
   const [repo, setRepo] = useState<string>("");
   const [owner, setOwner] = useState<string>("");
@@ -68,11 +78,13 @@ export default function AddRepositoryDialog({
 
   /** Fill the name and owner fields from anything that names a repository. */
   const applyReference = (value: string): boolean => {
-    const parsed = parseGitHubRepoReference(value);
+    const parsed = parseHFRepositoryReference(value);
     if (!parsed) return false;
     setOwner(parsed.owner);
     setRepo(parsed.repo);
-    setReference(parseRepoReferenceParts(value));
+    const parts = parseRepoReferenceParts(value);
+    setReference(parts);
+    setRepoType(parts?.segments[0] === "datasets" ? "dataset" : parts?.segments[0] === "spaces" ? "space" : "model");
     setError("");
     return true;
   };
@@ -124,6 +136,8 @@ export default function AddRepositoryDialog({
         destinationOrg: destinationOrg.trim() || undefined,
         host: reference?.host ?? undefined,
         path: reference?.segments,
+        repoType,
+        sourceId: sourceId || undefined,
       });
 
       resetForm();
@@ -152,6 +166,16 @@ export default function AddRepositoryDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-y-6">
+          {sources.length > 1 && <label className="block space-y-2 text-sm">Hugging Face connection
+            <select className={inputClassName} aria-label="Hugging Face connection" value={sourceId} onChange={event => setSourceId(event.target.value)}>
+              <option value="">Primary matching connection</option>{sources.map(source => <option key={source.id} value={source.id}>{source.name}</option>)}
+            </select>
+          </label>}
+          <label className="block space-y-2 text-sm">Repository type
+            <select aria-label="Repository type" className={inputClassName} value={repoType} onChange={event => { setRepoType(event.target.value as "model" | "dataset" | "space"); setReference(null); setUrl(""); }}>
+              <option value="model">Model</option><option value="dataset">Dataset</option><option value="space">Space</option>
+            </select>
+          </label>
           <div className="space-y-4">
             <div>
               <label
@@ -166,7 +190,7 @@ export default function AddRepositoryDialog({
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
                 className={inputClassName}
-                placeholder="https://github.com/vercel/next.js"
+                placeholder="https://huggingface.co/datasets/owner/dataset"
                 autoComplete="off"
                 autoFocus
               />

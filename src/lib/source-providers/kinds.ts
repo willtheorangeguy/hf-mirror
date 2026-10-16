@@ -1,35 +1,20 @@
 /**
- * The source hosts Gitea Mirror can pull repositories from.
+ * The source hosts HF-mirror can pull repositories from.
  *
  * Kept free of imports so both server code and client components can use it.
- * "gitea" covers Gitea and Forgejo (and therefore Codeberg): they share the
- * same API surface.
  */
-export const SOURCE_PROVIDER_KINDS = ["github", "gitlab", "gitea"] as const;
+export const SOURCE_PROVIDER_KINDS = ["huggingface"] as const;
 
 export type SourceProviderKind = (typeof SOURCE_PROVIDER_KINDS)[number];
 
-export const DEFAULT_SOURCE_PROVIDER: SourceProviderKind = "github";
+export const DEFAULT_SOURCE_PROVIDER: SourceProviderKind = "huggingface";
 
-/** Sources other than GitHub are beta: they work end to end but have had less time in the field. */
 export function isBetaSourceProvider(kind: SourceProviderKind): boolean {
   return kind !== DEFAULT_SOURCE_PROVIDER;
 }
 
-/**
- * Sources whose API can list releases with their assets.
- *
- * GitHub has always been able to. Gitea and Forgejo expose the same shape at
- * `GET /repos/{owner}/{repo}/releases`, so Codeberg and self hosted instances
- * can mirror releases too (#440). GitLab is code only: its release API is not
- * wired up, so the resolver still forces releases off for it.
- */
-export const RELEASE_CAPABLE_SOURCE_KINDS = [
-  "github",
-  "gitea",
-] as const satisfies readonly SourceProviderKind[];
+export const RELEASE_CAPABLE_SOURCE_KINDS: readonly SourceProviderKind[] = [];
 
-/** True when a source kind's API can list releases. Unknown values are GitHub rows. */
 export function sourceKindSupportsReleases(kind: unknown): boolean {
   return (RELEASE_CAPABLE_SOURCE_KINDS as readonly string[]).includes(
     normalizeSourceProviderKind(kind)
@@ -38,22 +23,16 @@ export function sourceKindSupportsReleases(kind: unknown): boolean {
 
 /** Base URL used when the config has no instance URL for the provider. */
 export const SOURCE_PROVIDER_DEFAULT_URLS: Record<SourceProviderKind, string> = {
-  github: "https://github.com",
-  gitlab: "https://gitlab.com",
-  gitea: "https://codeberg.org",
+  huggingface: "https://huggingface.co",
 };
 
 export const SOURCE_PROVIDER_LABELS: Record<SourceProviderKind, string> = {
-  github: "GitHub",
-  gitlab: "GitLab",
-  gitea: "Gitea / Forgejo",
+  huggingface: "Hugging Face",
 };
 
 /** What the host calls a group of repositories owned by a team. */
 export const SOURCE_PROVIDER_ORG_NOUNS: Record<SourceProviderKind, string> = {
-  github: "organization",
-  gitlab: "group",
-  gitea: "organization",
+  huggingface: "organization",
 };
 
 export function isSourceProviderKind(value: unknown): value is SourceProviderKind {
@@ -63,23 +42,13 @@ export function isSourceProviderKind(value: unknown): value is SourceProviderKin
   );
 }
 
-/**
- * Org names are a single path segment on every source. GitLab nests groups,
- * but projects flatten onto the top level group, so a nested name would
- * import an organization whose repositories never match it.
- */
 export function isValidSourceOrgName(name: string): boolean {
   const trimmed = name.trim();
   return trimmed.length > 0 && !trimmed.includes("/");
 }
 
-/**
- * Coerce an untrusted value to a provider kind, defaulting to GitHub.
- * "forgejo" and "codeberg" are accepted as spellings of the Gitea kind.
- */
 export function normalizeSourceProviderKind(value: unknown): SourceProviderKind {
   if (isSourceProviderKind(value)) return value;
-  if (value === "forgejo" || value === "codeberg") return "gitea";
   return DEFAULT_SOURCE_PROVIDER;
 }
 
@@ -150,7 +119,6 @@ export interface RepositorySource {
   url: string;
 }
 
-/** Where a stored repository came from. Rows from before this column default to GitHub. */
 export function getRepositorySource(repo: RepositorySourceFields): RepositorySource {
   const provider = normalizeSourceProviderKind(repo.sourceProvider);
   return { provider, url: normalizeSourceUrl(repo.sourceUrl, provider) };

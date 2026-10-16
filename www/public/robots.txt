@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://gitea-mirror.raylabs.io/sitemap-index.xml

@@ -111,7 +111,7 @@ export function Organization() {
       }
 
       const response = await apiRequest<OrganizationsApiResponse>(
-        `/github/organizations?userId=${user.id}`,
+        `/source/organizations?userId=${user.id}`,
         {
           method: "GET",
         }
@@ -274,7 +274,7 @@ export function Organization() {
       }
 
       const org = organizations.find(o => o.id === orgId);
-      
+
       // Check if organization is currently being processed
       if (ignore && org && (org.status === "mirroring")) {
         toast.warning("Cannot ignore organization while it's being processed");
@@ -284,7 +284,7 @@ export function Organization() {
       setLoadingOrgIds((prev) => new Set(prev).add(orgId));
 
       const newStatus = ignore ? "ignored" : "imported";
-      
+
       // cascade: the organization's repositories follow it, so ignoring an
       // organization actually stops its mirrors from syncing (#429).
       const response = await apiRequest<{
@@ -293,11 +293,11 @@ export function Organization() {
         repositoriesChanged?: number;
         error?: string;
       }>(
-        `/organizations/${orgId}/status`, 
+        `/organizations/${orgId}/status`,
         {
           method: "PATCH",
-          data: { 
-            status: newStatus, 
+          data: {
+            status: newStatus,
             userId: user.id,
             cascade: true,
           },
@@ -309,11 +309,11 @@ export function Organization() {
         const repoNote = changed > 0
           ? ` (${changed} ${changed === 1 ? "repository" : "repositories"} ${ignore ? "ignored too" : "restored"})`
           : "";
-        toast.success(ignore 
+        toast.success(ignore
           ? `Organization will be ignored in future operations${repoNote}`
           : `Organization included for mirroring${repoNote}`
         );
-        
+
         // Update local state
         setOrganizations((prevOrgs) =>
           prevOrgs.map((org) =>
@@ -484,7 +484,7 @@ export function Organization() {
       );
 
       if (response.success) {
-        toast.success(`Removed ${orgToDelete.name} from Gitea Mirror.`);
+        toast.success(`Removed ${orgToDelete.name} from HF-mirror.`);
         await fetchOrganizations(false);
       } else {
         showErrorToast(response.error || "Failed to delete organization", toast);
@@ -586,13 +586,13 @@ export function Organization() {
               }
             />
           </div>
-          
+
           {/* Mobile Filter Drawer */}
           <Drawer>
             <DrawerTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
+              <Button
+                variant="outline"
+                size="icon"
                 className="relative h-10 w-10 shrink-0"
               >
                 <Filter className="h-4 w-4" />
@@ -610,7 +610,7 @@ export function Organization() {
                   Narrow down your organization list
                 </DrawerDescription>
               </DrawerHeader>
-              
+
               <div className="px-4 py-6 space-y-6 overflow-y-auto">
                 {/* Active filters summary */}
                 {hasActiveFilters && (
@@ -767,7 +767,7 @@ export function Organization() {
                   </Select>
                 </div>
               </div>
-              
+
               <DrawerFooter className="gap-2 px-4 pt-2 pb-4 border-t">
                 <DrawerClose asChild>
                   <Button className="w-full" size="sm">
@@ -782,7 +782,7 @@ export function Organization() {
               </DrawerFooter>
             </DrawerContent>
           </Drawer>
-          
+
           <OrganizationsViewToggle view={view} onChange={setView} compact />
 
           <Button
@@ -1021,7 +1021,7 @@ export function Organization() {
           <DialogHeader>
             <DialogTitle>Organization already exists</DialogTitle>
             <DialogDescription>
-              {duplicateOrgCandidate?.org ?? "This organization"} is already synced in Gitea Mirror.
+              {duplicateOrgCandidate?.org ?? "This organization"} is already synced in HF-mirror.
               Continuing will reuse the existing entry without creating a duplicate. You can remove it later if needed.
             </DialogDescription>
           </DialogHeader>
@@ -1048,9 +1048,9 @@ export function Organization() {
       }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove organization from Gitea Mirror?</DialogTitle>
+            <DialogTitle>Remove organization from HF-mirror?</DialogTitle>
             <DialogDescription>
-              {orgToDelete?.name ?? "This organization"} will be deleted from Gitea Mirror only. Nothing will be removed from Gitea; you will need to clean it up manually in Gitea if desired.
+              {orgToDelete?.name ?? "This organization"} will be deleted from HF-mirror only. Nothing will be removed from Gitea; you will need to clean it up manually in Gitea if desired.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

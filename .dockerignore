@@ -47,7 +47,6 @@ docker-compose.*.yml
 
 # Documentation
 README.md
-LICENSE
 docs
 
 # Temporary files
@@ -63,3 +62,9 @@ logs
 # Cache
 .cache
 .npm
+data
+certs
+tests/e2e/test-results
+tests/e2e/playwright-report
+
+.astro

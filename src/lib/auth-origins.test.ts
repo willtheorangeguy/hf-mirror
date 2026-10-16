@@ -34,9 +34,9 @@ describe("resolveTrustedOrigins", () => {
   });
 
   test("includes BETTER_AUTH_URL from env", async () => {
-    process.env.BETTER_AUTH_URL = "https://gitea-mirror.example.com";
+    process.env.BETTER_AUTH_URL = "https://hf-mirror.example.com";
     const origins = await resolveTrustedOrigins();
-    expect(origins).toContain("https://gitea-mirror.example.com");
+    expect(origins).toContain("https://hf-mirror.example.com");
   });
 
   test("includes BETTER_AUTH_TRUSTED_ORIGINS (comma-separated)", async () => {
@@ -57,11 +57,11 @@ describe("resolveTrustedOrigins", () => {
 
   test("auto-detects origin from x-forwarded-host + x-forwarded-proto", async () => {
     const req = mockRequest({
-      "x-forwarded-host": "gitea-mirror.mydomain.tld",
+      "x-forwarded-host": "hf-mirror.mydomain.tld",
       "x-forwarded-proto": "https",
     });
     const origins = await resolveTrustedOrigins(req);
-    expect(origins).toContain("https://gitea-mirror.mydomain.tld");
+    expect(origins).toContain("https://hf-mirror.mydomain.tld");
   });
 
   test("falls back to host header when x-forwarded-host is absent", async () => {
@@ -128,10 +128,10 @@ describe("resolveTrustedOrigins", () => {
 describe("extractSsoProviderOrigins", () => {
   test("extracts the issuer origin, stripping any path", () => {
     const origins = extractSsoProviderOrigins([
-      { issuer: "https://auth.example.dev/application/o/gitea-mirror/", oidcConfig: null },
+      { issuer: "https://auth.example.dev/application/o/hf-mirror/", oidcConfig: null },
     ]);
     expect(origins).toContain("https://auth.example.dev");
-    expect(origins).not.toContain("https://auth.example.dev/application/o/gitea-mirror/");
+    expect(origins).not.toContain("https://auth.example.dev/application/o/hf-mirror/");
   });
 
   test("extracts endpoint origins from oidcConfig, including hosts that differ from the issuer", () => {

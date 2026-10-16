@@ -1,16 +1,9 @@
-import { SiForgejo, SiGitea, SiGithub, SiGitlab } from "react-icons/si";
-import {
-  DESTINATION_PROVIDER_LABELS,
-  isPushDestinationKind,
-  normalizeDestinationProviderKind,
-  type DestinationProviderKind,
-} from "@/lib/destination-kinds";
+import { SiForgejo, SiGitea } from "react-icons/si";
+import { DESTINATION_PROVIDER_LABELS, normalizeDestinationProviderKind, type DestinationProviderKind } from "@/lib/destination-kinds";
 
 const icons: Record<DestinationProviderKind, React.ComponentType<{ className?: string }>> = {
   gitea: SiGitea,
   forgejo: SiForgejo,
-  github: SiGithub,
-  gitlab: SiGitlab,
 };
 
 /** Brand icon for the host mirrors are created on. */
@@ -29,8 +22,8 @@ export function DestinationIcon({
 export function destinationInfo(config: { provider?: string | null } | null | undefined): {
   provider: DestinationProviderKind;
   label: string;
-  isPushTarget: boolean;
+  canTransfer: boolean;
 } {
   const provider = normalizeDestinationProviderKind(config?.provider);
-  return { provider, label: DESTINATION_PROVIDER_LABELS[provider], isPushTarget: isPushDestinationKind(provider) };
+  return { provider, label: DESTINATION_PROVIDER_LABELS[provider], canTransfer: true };
 }

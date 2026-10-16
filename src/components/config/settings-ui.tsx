@@ -90,7 +90,7 @@ export function SectionTitle({
           {children}
         </span>
         {badge && (
-          <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-indigo-500">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-primary">
             {badge}
           </span>
         )}
@@ -140,7 +140,7 @@ export function OptionRow({
           {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
           <span className="text-sm font-medium leading-none">{label}</span>
           {badge && (
-            <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-indigo-500">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-primary">
               {badge}
             </span>
           )}
@@ -215,7 +215,7 @@ export function OptionTile({
       className={cn(
         "flex flex-1 items-start gap-3 rounded-lg border p-3.5 text-left transition-colors",
         selected
-          ? "border-indigo-500 bg-indigo-500/10"
+          ? "border-indigo-500 bg-primary/10"
           : "border-border hover:border-muted-foreground/40",
         disabled && "opacity-50 cursor-not-allowed"
       )}
@@ -247,7 +247,7 @@ export function OptionTile({
         </span>
       </span>
       {selected && (
-        <CircleCheck className="h-4 w-4 shrink-0 text-indigo-500" />
+        <CircleCheck className="h-4 w-4 shrink-0 text-primary" />
       )}
     </button>
   );

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { GitHubConfigForm } from './GitHubConfigForm';
+import { HFConfigForm } from './HFConfigForm';
 import { GiteaConfigForm } from './GiteaConfigForm';
 import { SourcesCard } from './SourcesCard';
-import { GitHubMirrorSettings } from './GitHubMirrorSettings';
+import { HFMirrorSettings } from './HFMirrorSettings';
 import { AutomationSettings } from './AutomationSettings';
 import { SSOSettings } from './SSOSettings';
 import { ApiKeysSettings } from './ApiKeysSettings';
@@ -10,7 +10,7 @@ import { NotificationSettings } from './NotificationSettings';
 import type {
   ConfigApiResponse,
   GiteaConfig,
-  GitHubConfig,
+  HFSourceConfig,
   SaveConfigApiRequest,
   SaveConfigApiResponse,
   ScheduleConfig,
@@ -33,7 +33,7 @@ import { withBase } from '@/lib/base-path';
 import { SOURCE_PROVIDER_LABELS } from '@/lib/source-providers/kinds';
 
 type ConfigState = {
-  githubConfig: GitHubConfig;
+  sourceConfig: HFSourceConfig;
   giteaConfig: GiteaConfig;
   scheduleConfig: ScheduleConfig;
   cleanupConfig: DatabaseCleanupConfig;
@@ -46,8 +46,8 @@ const CONFIG_API_PATH = withBase('/api/config');
 
 export function ConfigTabs() {
   const [config, setConfig] = useState<ConfigState>({
-    githubConfig: {
-      provider: 'github',
+    sourceConfig: {
+      provider: 'huggingface',
       url: '',
       username: '',
       token: '',
@@ -61,7 +61,7 @@ export function ConfigTabs() {
       externalUrl: '',
       username: '',
       token: '',
-      organization: 'github-mirrors',
+      organization: 'hf-mirrors',
       visibility: 'public',
       starredReposOrg: 'starred',
       starredReposMode: 'dedicated-org',
@@ -77,21 +77,16 @@ export function ConfigTabs() {
       interval: 0, // Will be replaced with actual value from API
     },
     cleanupConfig: {
-      enabled: false, // Don't set defaults here - will be loaded from API  
-      retentionDays: 0, // Will be replaced with actual value from API
-      deleteIfNotInGitHub: true,
-      orphanedRepoAction: "archive",
-      dryRun: false,
-      deleteFromGitea: false,
-      protectedRepos: [],
+      enabled: false,
+      retentionDays: 0,
     },
     mirrorOptions: {
       mirrorReleases: false,
-      mirrorLFS: false,
-      mirrorMetadata: false,
+      mirrorLFS: true,
+      mirrorMetadata: true,
       metadataComponents: {
-        issues: false,
-        pullRequests: false,
+        issues: true,
+        pullRequests: true,
         labels: false,
         milestones: false,
         wiki: false,
@@ -120,23 +115,23 @@ export function ConfigTabs() {
 
   const [isAutoSavingSchedule, setIsAutoSavingSchedule] = useState<boolean>(false);
   const [isAutoSavingCleanup, setIsAutoSavingCleanup] = useState<boolean>(false);
-  const [isAutoSavingGitHub, setIsAutoSavingGitHub] = useState<boolean>(false);
+  const [isAutoSavingSource, setIsAutoSavingSource] = useState<boolean>(false);
   const [isAutoSavingGitea, setIsAutoSavingGitea] = useState<boolean>(false);
   const [isAutoSavingNotification, setIsAutoSavingNotification] = useState<boolean>(false);
   const autoSaveScheduleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoSaveCleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const autoSaveGitHubTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveSourceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoSaveGiteaTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoSaveNotificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sources are the source of truth for the source connection; the legacy
-  // githubConfig check only covers APIs that predate multi-source support.
+  // sourceConfig check only covers APIs that predate multi-source support.
   const isSourceConnected = (): boolean => {
     if (sources.length > 0) {
-      return sources.some((source) => Boolean(source.token && source.token.trim()));
+      return sources.length > 0;
     }
-    const { githubConfig } = config;
-    return !!(githubConfig.username.trim() && githubConfig.token.trim());
+    const { sourceConfig } = config;
+    return !!sourceConfig.username.trim();
   };
 
   const isConfigFormValid = (): boolean => {
@@ -149,16 +144,16 @@ export function ConfigTabs() {
     return isSourceConnected() && isGiteaValid;
   };
 
-  const isGitHubConfigValid = (): boolean => {
+  const isSourceConfigValid = (): boolean => {
     return isSourceConnected();
   };
 
   // Removed the problematic useEffect that was causing circular dependencies
   // The lastRun and nextRun should be managed by the backend and fetched via API
 
-  const sourceLabel = SOURCE_PROVIDER_LABELS[config.githubConfig.provider ?? 'github'];
+  const sourceLabel = SOURCE_PROVIDER_LABELS[config.sourceConfig.provider ?? 'huggingface'];
 
-  const handleImportGitHubData = async () => {
+  const handleImportHFData = async () => {
     if (!user?.id) return;
     setIsSyncing(true);
     try {
@@ -213,7 +208,7 @@ export function ConfigTabs() {
 
       const reqPayload: SaveConfigApiRequest = {
         userId: user.id!,
-        githubConfig: config.githubConfig,
+        sourceConfig: config.sourceConfig,
         giteaConfig: config.giteaConfig,
         scheduleConfig: scheduleConfig,
         cleanupConfig: config.cleanupConfig,
@@ -262,7 +257,7 @@ export function ConfigTabs() {
         setIsAutoSavingSchedule(false);
       }
     }, 500); // 500ms debounce
-  }, [user?.id, config.githubConfig, config.giteaConfig, config.cleanupConfig]);
+  }, [user?.id, config.sourceConfig, config.giteaConfig, config.cleanupConfig]);
 
   // Auto-save function specifically for cleanup config changes
   const autoSaveCleanupConfig = useCallback(async (cleanupConfig: DatabaseCleanupConfig) => {
@@ -279,7 +274,7 @@ export function ConfigTabs() {
 
       const reqPayload: SaveConfigApiRequest = {
         userId: user.id!,
-        githubConfig: config.githubConfig,
+        sourceConfig: config.sourceConfig,
         giteaConfig: config.giteaConfig,
         scheduleConfig: config.scheduleConfig,
         cleanupConfig: cleanupConfig,
@@ -327,27 +322,27 @@ export function ConfigTabs() {
         setIsAutoSavingCleanup(false);
       }
     }, 500); // 500ms debounce
-  }, [user?.id, config.githubConfig, config.giteaConfig, config.scheduleConfig]);
+  }, [user?.id, config.sourceConfig, config.giteaConfig, config.scheduleConfig]);
 
-  // Auto-save function specifically for GitHub config changes
-  const autoSaveGitHubConfig = useCallback(async (
-    githubConfig: GitHubConfig,
+  // Auto-save function specifically for Hugging Face config changes
+  const autoSaveSourceConfig = useCallback(async (
+    sourceConfig: HFSourceConfig,
     options: { confirmSourceChange?: boolean } = {},
   ) => {
     if (!user?.id) return;
 
     // Clear any existing timeout
-    if (autoSaveGitHubTimeoutRef.current) {
-      clearTimeout(autoSaveGitHubTimeoutRef.current);
+    if (autoSaveSourceTimeoutRef.current) {
+      clearTimeout(autoSaveSourceTimeoutRef.current);
     }
 
     // Debounce the auto-save to prevent excessive API calls
-    autoSaveGitHubTimeoutRef.current = setTimeout(async () => {
-      setIsAutoSavingGitHub(true);
+    autoSaveSourceTimeoutRef.current = setTimeout(async () => {
+      setIsAutoSavingSource(true);
 
       const reqPayload: SaveConfigApiRequest = {
         userId: user.id!,
-        githubConfig: githubConfig,
+        sourceConfig: sourceConfig,
         giteaConfig: config.giteaConfig,
         scheduleConfig: config.scheduleConfig,
         cleanupConfig: config.cleanupConfig,
@@ -377,7 +372,7 @@ export function ConfigTabs() {
       } catch (error) {
         showErrorToast(error, toast);
       } finally {
-        setIsAutoSavingGitHub(false);
+        setIsAutoSavingSource(false);
       }
     }, 500); // 500ms debounce
   }, [user?.id, config.giteaConfig, config.scheduleConfig, config.cleanupConfig]);
@@ -400,7 +395,7 @@ export function ConfigTabs() {
 
       const reqPayload: SaveConfigApiRequest = {
         userId: user.id!,
-        githubConfig: config.githubConfig,
+        sourceConfig: config.sourceConfig,
         giteaConfig: giteaConfig,
         scheduleConfig: config.scheduleConfig,
         cleanupConfig: config.cleanupConfig,
@@ -433,15 +428,15 @@ export function ConfigTabs() {
         setIsAutoSavingGitea(false);
       }
     }, 500); // 500ms debounce
-  }, [user?.id, config.githubConfig, config.scheduleConfig, config.cleanupConfig]);
+  }, [user?.id, config.sourceConfig, config.scheduleConfig, config.cleanupConfig]);
 
-  // Auto-save function for mirror options (handled within GitHub config)
+  // Auto-save function for mirror options (handled within Hugging Face config)
   const autoSaveMirrorOptions = useCallback(async (mirrorOptions: MirrorOptions) => {
     if (!user?.id) return;
 
     const reqPayload: SaveConfigApiRequest = {
       userId: user.id!,
-      githubConfig: config.githubConfig,
+      sourceConfig: config.sourceConfig,
       giteaConfig: config.giteaConfig,
       scheduleConfig: config.scheduleConfig,
       cleanupConfig: config.cleanupConfig,
@@ -468,15 +463,15 @@ export function ConfigTabs() {
     } catch (error) {
       showErrorToast(error, toast);
     }
-  }, [user?.id, config.githubConfig, config.giteaConfig, config.scheduleConfig, config.cleanupConfig, config.advancedOptions]);
+  }, [user?.id, config.sourceConfig, config.giteaConfig, config.scheduleConfig, config.cleanupConfig, config.advancedOptions]);
 
-  // Auto-save function for advanced options (handled within GitHub config)
+  // Auto-save function for advanced options (handled within Hugging Face config)
   const autoSaveAdvancedOptions = useCallback(async (advancedOptions: AdvancedOptions) => {
     if (!user?.id) return;
 
     const reqPayload: SaveConfigApiRequest = {
       userId: user.id!,
-      githubConfig: config.githubConfig,
+      sourceConfig: config.sourceConfig,
       giteaConfig: config.giteaConfig,
       scheduleConfig: config.scheduleConfig,
       cleanupConfig: config.cleanupConfig,
@@ -503,7 +498,7 @@ export function ConfigTabs() {
     } catch (error) {
       showErrorToast(error, toast);
     }
-  }, [user?.id, config.githubConfig, config.giteaConfig, config.scheduleConfig, config.cleanupConfig, config.mirrorOptions]);
+  }, [user?.id, config.sourceConfig, config.giteaConfig, config.scheduleConfig, config.cleanupConfig, config.mirrorOptions]);
 
   // Auto-save function for notification config changes
   const autoSaveNotificationConfig = useCallback(async (notifConfig: NotificationConfig) => {
@@ -520,7 +515,7 @@ export function ConfigTabs() {
 
       const reqPayload = {
         userId: user.id!,
-        githubConfig: config.githubConfig,
+        sourceConfig: config.sourceConfig,
         giteaConfig: config.giteaConfig,
         scheduleConfig: config.scheduleConfig,
         cleanupConfig: config.cleanupConfig,
@@ -552,7 +547,7 @@ export function ConfigTabs() {
         setIsAutoSavingNotification(false);
       }
     }, 500); // 500ms debounce
-  }, [user?.id, config.githubConfig, config.giteaConfig, config.scheduleConfig, config.cleanupConfig, config.mirrorOptions, config.advancedOptions]);
+  }, [user?.id, config.sourceConfig, config.giteaConfig, config.scheduleConfig, config.cleanupConfig, config.mirrorOptions, config.advancedOptions]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -563,8 +558,8 @@ export function ConfigTabs() {
       if (autoSaveCleanupTimeoutRef.current) {
         clearTimeout(autoSaveCleanupTimeoutRef.current);
       }
-      if (autoSaveGitHubTimeoutRef.current) {
-        clearTimeout(autoSaveGitHubTimeoutRef.current);
+      if (autoSaveSourceTimeoutRef.current) {
+        clearTimeout(autoSaveSourceTimeoutRef.current);
       }
       if (autoSaveGiteaTimeoutRef.current) {
         clearTimeout(autoSaveGiteaTimeoutRef.current);
@@ -590,9 +585,9 @@ export function ConfigTabs() {
         setLocks(response.locks ?? null);
         setSources(response.sources ?? []);
         setConfig(prev => ({
-          githubConfig: {
-            ...prev.githubConfig,
-            ...response.githubConfig, // Merge so a response without provider keeps the default
+          sourceConfig: {
+            ...prev.sourceConfig,
+            ...response.sourceConfig, // Merge so a response without provider keeps the default
           },
           giteaConfig:
             response.giteaConfig || prev.giteaConfig,
@@ -600,7 +595,7 @@ export function ConfigTabs() {
             response.scheduleConfig || prev.scheduleConfig,
           cleanupConfig: {
             ...prev.cleanupConfig,
-            ...response.cleanupConfig, // Merge to preserve all fields
+            ...response.cleanupConfig,
           },
           mirrorOptions: {
             ...prev.mirrorOptions,
@@ -644,7 +639,7 @@ export function ConfigTabs() {
 
         {/* Content section - Grid layout */}
         <div className="space-y-4">
-          {/* GitHub & Gitea connections - Side by side */}
+          {/* Hugging Face & Gitea connections - Side by side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="border rounded-lg p-4">
               <div className="flex justify-between items-center mb-4">
@@ -714,16 +709,16 @@ export function ConfigTabs() {
         </div>
         <div className="flex gap-x-4 w-full md:w-auto">
           <Button
-            onClick={handleImportGitHubData}
-            disabled={isSyncing || !isGitHubConfigValid()}
+            onClick={handleImportHFData}
+            disabled={isSyncing || !isSourceConfigValid()}
             title={
-              !isGitHubConfigValid()
-                ? 'Connect a source with a token first'
+              !isSourceConfigValid()
+                ? 'Connect a Hugging Face source first'
                 : isSyncing
                 ? 'Import in progress'
                 : `Import ${sourceLabel} Data`
             }
-            className="w-full bg-indigo-500 text-white hover:bg-indigo-600 disabled:bg-muted disabled:text-muted-foreground md:w-auto"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground md:w-auto"
           >
             {isSyncing ? (
               <>
@@ -751,14 +746,14 @@ export function ConfigTabs() {
 
         <TabsContent value="connections" className="space-y-6">
           {(() => {
-            const githubFormProps = {
-              config: config.githubConfig,
-              setConfig: (update: React.SetStateAction<typeof config.githubConfig>) =>
+            const sourceFormProps = {
+              config: config.sourceConfig,
+              setConfig: (update: React.SetStateAction<typeof config.sourceConfig>) =>
                 setConfig(prev => ({
                   ...prev,
-                  githubConfig:
+                  sourceConfig:
                     typeof update === 'function'
-                      ? update(prev.githubConfig)
+                      ? update(prev.sourceConfig)
                       : update,
                 })),
               mirrorOptions: config.mirrorOptions,
@@ -788,11 +783,11 @@ export function ConfigTabs() {
                       ? update(prev.giteaConfig)
                       : update,
                 })),
-              onAutoSave: autoSaveGitHubConfig,
+              onAutoSave: autoSaveSourceConfig,
               onMirrorOptionsAutoSave: autoSaveMirrorOptions,
               onAdvancedOptionsAutoSave: autoSaveAdvancedOptions,
               onGiteaAutoSave: autoSaveGiteaConfig,
-              isAutoSaving: isAutoSavingGitHub,
+              isAutoSaving: isAutoSavingSource,
               sourceLock: locks?.source,
             };
             const giteaFormProps = {
@@ -807,7 +802,7 @@ export function ConfigTabs() {
                 })),
               onAutoSave: autoSaveGiteaConfig,
               isAutoSaving: isAutoSavingGitea,
-              githubUsername: config.githubConfig.username,
+              sourceUsername: config.sourceConfig.username,
               destinationLock: locks?.destination,
             };
             return (
@@ -818,19 +813,19 @@ export function ConfigTabs() {
                   <GiteaConfigForm {...giteaFormProps} part="connection" />
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-start">
-                  <GitHubConfigForm {...githubFormProps} part="settings" />
+                  <HFConfigForm {...sourceFormProps} part="settings" />
                   <div className="flex flex-col gap-6">
                     <GiteaConfigForm {...giteaFormProps} part="organization" />
-                    <GitHubMirrorSettings
+                    <HFMirrorSettings
                       part="content"
-                      githubConfig={config.githubConfig}
+                      sourceConfig={config.sourceConfig}
                       sources={sources}
                       destinationProvider={config.giteaConfig.provider}
                       mirrorOptions={config.mirrorOptions}
                       advancedOptions={config.advancedOptions}
-                      onGitHubConfigChange={newConfig => {
-                        setConfig(prev => ({ ...prev, githubConfig: newConfig }));
-                        autoSaveGitHubConfig(newConfig);
+                      onSourceConfigChange={newConfig => {
+                        setConfig(prev => ({ ...prev, sourceConfig: newConfig }));
+                        autoSaveSourceConfig(newConfig);
                       }}
                       onMirrorOptionsChange={newOptions => {
                         setConfig(prev => ({ ...prev, mirrorOptions: newOptions }));

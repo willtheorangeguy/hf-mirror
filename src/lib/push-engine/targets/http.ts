@@ -8,6 +8,7 @@ export const DEFAULT_TARGET_TIMEOUT_MS = 30_000;
 
 export interface TargetFetchInit {
   method?: string;
+  signal?: AbortSignal;
   headers?: Record<string, string>;
   body?: unknown;
   timeoutMs?: number;
@@ -32,7 +33,7 @@ export async function targetFetch<T>(
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(init.signal ? [init.signal] : [])]),
   });
 
   if (!response.ok) {

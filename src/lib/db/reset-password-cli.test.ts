@@ -9,15 +9,15 @@
  *
  * Other test files replace bun:sqlite with mock.module, which is process wide
  * in bun and depends on file order, so the suite runs in an isolated child
- * process (same harness as gitea-incremental-metadata.test.ts).
+ * process.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const CHILD_FLAG = "GM_RESET_PASSWORD_CLI_ISOLATED";
+const CHILD_FLAG = "HF_RESET_PASSWORD_CLI_ISOLATED";
 const isChild = !!process.env[CHILD_FLAG];
 
 if (!isChild) {
@@ -48,7 +48,7 @@ function run(cmd: string[], cwd: string) {
 
 describe.skipIf(!isChild)("manage-db reset-password", () => {
   beforeAll(() => {
-    temporaryRoot = mkdtempSync(join(tmpdir(), "gitea-mirror-reset-password-"));
+    temporaryRoot = mkdtempSync(join(tmpdir(), "hf-mirror-reset-password-"));
     bundle = join(temporaryRoot, "manage-db.js");
     run([process.execPath, "build", "scripts/manage-db.ts", "--target=bun", `--outfile=${bundle}`], root);
   });
@@ -65,10 +65,10 @@ describe.skipIf(!isChild)("manage-db reset-password", () => {
 
         // A real schema: init runs the migrations from ./drizzle.
         const cwd = mkdtempSync(join(temporaryRoot, "case-"));
-        symlinkSync(join(root, "drizzle"), join(cwd, "drizzle"));
+        cpSync(join(root, "drizzle"), join(cwd, "drizzle"), { recursive: true });
         run([process.execPath, script, "init"], cwd);
 
-        const db = new Database(join(cwd, "data/gitea-mirror.db"));
+        const db = new Database(join(cwd, "data/hf-mirror.db"));
         try {
           db.exec(`
             INSERT INTO users (id, name, email) VALUES ('target', 'Target', 'admin@example.com'), ('other', 'Other', 'other@example.com');

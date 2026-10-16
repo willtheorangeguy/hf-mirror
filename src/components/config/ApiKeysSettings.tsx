@@ -34,8 +34,6 @@ import {
   type ApiKeyExpiryOption,
 } from '@/lib/api-keys';
 
-const DOCS_URL = 'https://github.com/RayLabsHQ/gitea-mirror/blob/main/docs/API.md';
-
 /** The subset of the plugin's key record the list needs. The secret never comes back. */
 interface ApiKeyRow {
   id: string;
@@ -192,7 +190,7 @@ export function ApiKeysSettings() {
         <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
           <Button
             size="sm"
-            className="bg-indigo-500 text-white hover:bg-indigo-600"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => setDialogOpen(true)}
           >
             <Plus className="h-4 w-4" />
@@ -394,9 +392,7 @@ export function ApiKeysSettings() {
         <Info className="h-3.5 w-3.5" />
         <span>
           Send the key in the <code className="font-mono">{API_KEY_HEADER}</code> header.{' '}
-          <a href={DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
-            API docs
-          </a>
+
         </span>
       </div>
     </div>

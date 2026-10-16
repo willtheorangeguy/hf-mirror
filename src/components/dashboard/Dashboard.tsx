@@ -23,24 +23,24 @@ import { useTimeFormat } from "@/hooks/useTimeFormat";
 // Helper function to format last sync time
 function formatLastSyncTime(date: Date | null): string {
   if (!date) return "Never";
-  
+
   const now = new Date();
   const syncDate = new Date(date);
   const diffMs = now.getTime() - syncDate.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
+
   // Show relative time for recent syncs
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins} min ago`;
   if (diffHours < 24) return `${diffHours} hr${diffHours === 1 ? '' : 's'} ago`;
   if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  
+
   // For older syncs, show week count
   const diffWeeks = Math.floor(diffDays / 7);
   if (diffWeeks < 4) return `${diffWeeks} week${diffWeeks === 1 ? '' : 's'} ago`;
-  
+
   // For even older, show month count
   const diffMonths = Math.floor(diffDays / 30);
   return `${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`;
@@ -110,28 +110,28 @@ export function Dashboard() {
     if (!user?.id) return;
 
     const eventSource = new EventSource(`${withBase("/api/events")}?userId=${user.id}`);
-    
+
     eventSource.addEventListener("rate-limit", (event) => {
       try {
         const data = JSON.parse(event.data);
-        
+
         switch (data.type) {
           case "warning":
             // 80% threshold warning
-            toast.warning("GitHub API Rate Limit Warning", {
+            toast.warning("Hugging Face API Rate Limit Warning", {
               description: data.message,
               duration: 8000,
             });
             break;
-            
+
           case "exceeded":
             // 100% rate limit exceeded
-            toast.error("GitHub API Rate Limit Exceeded", {
+            toast.error("Hugging Face API Rate Limit Exceeded", {
               description: data.message,
               duration: 10000,
             });
             break;
-            
+
           case "resumed":
             // Rate limit reset notification
             toast.success("Rate Limit Reset", {
@@ -160,7 +160,7 @@ export function Dashboard() {
       // Don't fetch data if configuration is not complete
       if (!isFullyConfigured) {
         if (showToast) {
-          toast.info("Please configure GitHub and Gitea settings first");
+          toast.info("Please configure Hugging Face and Gitea settings first");
         }
         return false;
       }
@@ -317,7 +317,7 @@ export function Dashboard() {
           title="Organizations"
           value={orgCount}
           icon={<Building2 className="h-4 w-4" />}
-          description="From GitHub"
+          description="From Hugging Face"
         />
         <StatusCard
           title="Last Sync"

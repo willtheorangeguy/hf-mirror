@@ -1,7 +1,7 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Star, Globe, Lock, Shield, Info, MonitorCog } from "lucide-react";
+import { Star, Globe, Lock, Shield, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -56,7 +56,7 @@ export const OrganizationConfiguration: React.FC<OrganizationConfigurationProps>
 
       <div className="space-y-2">
         <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-          Starred repository destination
+          Liked repository destination
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger>
@@ -102,7 +102,7 @@ export const OrganizationConfiguration: React.FC<OrganizationConfigurationProps>
           {
             activeStarredMode === "dedicated-org"
               ? "All starred repositories go to a single destination organization"
-              : "Starred repositories keep their original GitHub Owner/Org destination"
+              : "Liked repositories keep their original Hugging Face Owner/Org destination"
           }
         </p>
       </div>
@@ -114,14 +114,14 @@ export const OrganizationConfiguration: React.FC<OrganizationConfigurationProps>
             <div className="space-y-1">
               <Label htmlFor="starredReposOrg" className="text-sm font-normal flex items-center gap-2">
                 <Star className="h-3.5 w-3.5" />
-                Starred Repos Organization
+                Liked Repos Organization
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
                       <Info className="h-3.5 w-3.5 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Starred repositories will be organized separately in this organization</p>
+                      <p>Liked repositories will be organized separately in this organization</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -165,7 +165,7 @@ export const OrganizationConfiguration: React.FC<OrganizationConfigurationProps>
               id="destinationOrg"
               value={destinationOrg || ""}
               onChange={(e) => onDestinationOrgChange(e.target.value)}
-              placeholder={strategy === "mixed" ? "github-personal" : "github-mirrors"}
+              placeholder={strategy === "mixed" ? "hf-personal" : "hf-mirrors"}
               className=""
             />
             <p className="text-xs text-muted-foreground mt-1">

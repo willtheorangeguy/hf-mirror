@@ -18,14 +18,16 @@ export const userSchema = z.object({
   updatedAt: z.coerce.date(),
 });
 
-export const githubConfigSchema = z.object({
+export const sourceConfigSchema = z.object({
   owner: z.string(),
   type: z.enum(["personal", "organization"]),
   token: z.string(),
-  // Which host the repositories come from. "gitea" also covers Forgejo.
-  provider: z.enum(SOURCE_PROVIDER_KINDS).default("github"),
-  // Base URL of the instance for GitLab and Gitea sources.
+  // HF source connection.
+  provider: z.enum(SOURCE_PROVIDER_KINDS).default("huggingface"),
+
   url: z.string().optional(),
+  repoTypes: z.array(z.enum(["model", "dataset", "space"])).default(["model", "dataset", "space"]),
+  collections: z.array(z.string()).default([]),
   includeStarred: z.boolean().default(false),
   includeForks: z.boolean().default(true),
   skipForks: z.boolean().default(false),
@@ -53,33 +55,6 @@ export const backupStrategyEnum = z.enum([
   "block-on-force-push",
 ]);
 
-/**
- * Per-object overrides for the global mirror options in `giteaConfigSchema`.
- *
- * Every field is nullable, and `null`/absent means "inherit from the next tier
- * out". Resolution order is global config -> organization -> repository, and it
- * is applied per field, so a repository can override LFS while still inheriting
- * the org's issue setting. See `resolveMirrorOptions` in
- * `src/lib/utils/mirror-overrides.ts`.
- *
- * `releaseLimit` is the one non-boolean: how many of the newest GitHub releases
- * to keep in Gitea (the global default is `giteaConfigSchema.releaseLimit`).
- * It is deliberately a plain `z.number()` rather than `int().min(1)`: a stored
- * out-of-range value must degrade to "inherit" for that field alone, not make
- * the whole overrides object unparseable and silently drop the LFS opt-out
- * next to it. `normalizeReleaseLimit` does the sanitizing.
- *
- * `releaseAssetLimit` follows the same rule (`normalizeReleaseAssetLimit`):
- * assets are uploaded only for the newest N mirrored releases. 0 is a real
- * value (notes only); null/absent means inherit.
- *
- * `skipForks` is organization-tier only: it opts an organization out of
- * importing and mirroring forked repositories without touching the global
- * `githubConfig.skipForks` switch. Null/absent inherits that global value.
- * It is deliberately NOT part of `MIRROR_OVERRIDE_KEYS` in
- * `mirror-overrides.ts` (those mirror `giteaConfigSchema` flags); see
- * `ORG_SELECTION_OVERRIDE_KEYS` there.
- */
 export const mirrorOverridesSchema = z.object({
   lfs: z.boolean().nullable().optional(),
   wiki: z.boolean().nullable().optional(),
@@ -97,16 +72,16 @@ export const mirrorOverridesSchema = z.object({
 export type MirrorOverrides = z.infer<typeof mirrorOverridesSchema>;
 
 export const giteaConfigSchema = z.object({
-  url: z.url(),
-  // Gitea and Forgejo are pull mirrors (same API); GitHub and GitLab are
+  url: z.union([z.url(), z.literal("")]),
+
   // push targets served by src/lib/push-engine.
-  provider: z.enum(["gitea", "forgejo", "github", "gitlab"]).default("gitea"),
+  provider: z.enum(["gitea", "forgejo"]).default("gitea"),
   externalUrl: z.url().optional(),
   token: z.string(),
   defaultOwner: z.string(),
   organization: z.string().optional(),
   mirrorInterval: z.string().default("8h"),
-  lfs: z.boolean().default(false),
+  lfs: z.boolean().default(true),
   wiki: z.boolean().default(false),
   visibility: z
     .enum(["public", "private", "limited", "default"])
@@ -169,16 +144,7 @@ export const scheduleConfigSchema = z.object({
 
 export const cleanupConfigSchema = z.object({
   enabled: z.boolean().default(false),
-  retentionDays: z.number().default(604800), // 7 days in seconds
-  deleteFromGitea: z.boolean().default(false),
-  deleteIfNotInGitHub: z.boolean().default(true),
-  protectedRepos: z.array(z.string()).default([]),
-  dryRun: z.boolean().default(false),
-  orphanedRepoAction: z
-    .enum(["skip", "archive", "delete"])
-    .default("archive"),
-  batchSize: z.number().default(10),
-  pauseBetweenDeletes: z.number().default(2000),
+  retentionDays: z.number().default(604800),
   lastRun: z.coerce.date().optional(),
   nextRun: z.coerce.date().optional(),
 });
@@ -226,7 +192,7 @@ export const configSchema = z.object({
   userId: z.string(),
   name: z.string(),
   isActive: z.boolean().default(true),
-  githubConfig: githubConfigSchema,
+  sourceConfig: sourceConfigSchema,
   giteaConfig: giteaConfigSchema,
   // Unused/reserved — stored for future glob support but not currently read
   include: z.array(z.string()).default(["*"]),
@@ -239,20 +205,20 @@ export const configSchema = z.object({
 });
 
 // One connected source host per row of the sources table. Parses leniently
-// for reads (defaults like githubConfigSchema); the write path in
+// for reads (defaults like sourceConfigSchema); the write path in
 // src/lib/sources.ts validates strictly.
 export const sourceSchema = z.object({
   id: z.string(),
   userId: z.string(),
   name: z.string(),
-  // Which host the repositories come from. "gitea" also covers Forgejo.
-  provider: z.enum(SOURCE_PROVIDER_KINDS).default("github"),
+  // HF source connection.
+  provider: z.enum(SOURCE_PROVIDER_KINDS).default("huggingface"),
   // Normalized base URL of the instance; the provider default is resolved
   // on write so the empty string is never stored.
   url: z.string().default(""),
   username: z.string().default(""),
   // AES-256-GCM encrypted at rest, same convention as
-  // configs.githubConfig.token. Null means public-only access.
+  // configs.sourceConfig.token. Null means public-only access.
   token: z.string().nullable().optional(),
   enabled: z.boolean().default(true),
   createdAt: z.coerce.date(),
@@ -260,6 +226,8 @@ export const sourceSchema = z.object({
 });
 
 export const repositorySchema = z.object({
+  repoType: z.enum(["model", "dataset", "space"]).default("model"),
+  isGated: z.boolean().default(false),
   id: z.string(),
   userId: z.string(),
   configId: z.string(),
@@ -445,8 +413,8 @@ export const configs = sqliteTable("configs", {
   name: text("name").notNull(),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
 
-  githubConfig: text("github_config", { mode: "json" })
-    .$type<z.infer<typeof githubConfigSchema>>()
+  sourceConfig: text("source_config", { mode: "json" })
+    .$type<z.infer<typeof sourceConfigSchema>>()
     .notNull(),
 
   giteaConfig: text("gitea_config", { mode: "json" })
@@ -486,15 +454,15 @@ export const configs = sqliteTable("configs", {
 }, (_table) => []);
 
 // One connected source host per user. Multiple rows per user are allowed
-// (github.com plus a GHES instance, or GitLab plus Gitea, ...); the first
+
 // row by createdAt is the "primary" source mirrored into the legacy
-// configs.githubConfig connection fields for backward compatibility.
+// configs.sourceConfig connection fields for backward compatibility.
 export const sources = sqliteTable("sources", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
-  // Display label for the sources list. Auto-derived ("GitHub (octocat)")
+
   // by src/lib/sources.ts when the caller leaves it blank.
   name: text("name").notNull(),
   provider: text("provider")
@@ -507,7 +475,7 @@ export const sources = sqliteTable("sources", {
   // The account the token belongs to (the legacy config's "owner").
   username: text("username").notNull().default(""),
   // AES-256-GCM encrypted at rest, same convention as
-  // configs.githubConfig.token. Null means public-only access.
+  // configs.sourceConfig.token. Null means public-only access.
   token: text("token"),
   enabled: integer("enabled", { mode: "boolean" })
     .notNull()
@@ -524,6 +492,8 @@ export const sources = sqliteTable("sources", {
 ]);
 
 export const repositories = sqliteTable("repositories", {
+  repoType: text("repo_type").$type<"model" | "dataset" | "space">().notNull().default("model"),
+  isGated: integer("is_gated", { mode: "boolean" }).notNull().default(false),
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -536,13 +506,12 @@ export const repositories = sqliteTable("repositories", {
   normalizedFullName: text("normalized_full_name").notNull(),
   url: text("url").notNull(),
   cloneUrl: text("clone_url").notNull(),
-  // Which host the repository was imported from, and that host's base
-  // URL. The mirror step picks clone credentials from these, and the
-  // cleanup service only judges repositories from the configured source.
+  // Source identity used to select clone credentials and scope reconciliation.
   sourceProvider: text("source_provider")
     .$type<SourceProviderKind>()
     .notNull()
-    .default("github"),
+    // Historical SQL default; HF inserts always supply sourceProvider explicitly.
+    .default(sql`'github'`),
   sourceUrl: text("source_url").notNull().default("https://github.com"),
   // The sources row this repository was imported from. Nullable and
   // deliberately without a foreign key: legacy rows may reference sources
@@ -590,7 +559,7 @@ export const repositories = sqliteTable("repositories", {
   status: text("status").notNull().default("imported"),
   lastMirrored: integer("last_mirrored", { mode: "timestamp" }),
   errorMessage: text("error_message"),
-  
+
   destinationOrg: text("destination_org"),
 
   // Per-repository mirror option overrides. NULL means "inherit" (from the
@@ -618,10 +587,10 @@ export const repositories = sqliteTable("repositories", {
   index("idx_repositories_is_starred").on(table.isStarred),
   index("idx_repositories_user_imported_at").on(table.userId, table.importedAt),
   // Full names are unique per source: the same "owner/repo" can legitimately
-  // exist on two connected hosts (e.g. github.com and a GHES instance).
+
   // SQLite treats NULLs as distinct in unique indexes, so unlinked legacy
   // rows (source_id NULL) never collide with each other.
-  uniqueIndex("uniq_repositories_user_full_name").on(table.userId, table.sourceId, table.fullName),
+  uniqueIndex("uniq_repositories_user_full_name").on(table.userId, table.sourceId, table.repoType, table.fullName),
   uniqueIndex("uniq_repositories_user_normalized_full_name").on(table.userId, table.sourceId, table.normalizedFullName),
   index("idx_repositories_mirrored_location").on(table.userId, table.mirroredLocation),
 ]);
@@ -744,7 +713,7 @@ export const sessions = sqliteTable("sessions", {
 // Accounts table (for OAuth providers and credentials)
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
-  accountId: text("account_id").notNull(), 
+  accountId: text("account_id").notNull(),
   userId: text("user_id").notNull().references(() => users.id),
   providerId: text("provider_id").notNull(),
   // better-auth 1.7 keys accounts by (issuer, accountId). Local password
@@ -807,7 +776,7 @@ export const verifications = sqliteTable("verifications", {
 
 // ===== OAuth 2.1 / OIDC Provider tables (@better-auth/oauth-provider) =====
 //
-// These back the OAuth/OIDC *provider* feature (gitea-mirror acting as an
+// These back the OAuth/OIDC *provider* feature (hf-mirror acting as an
 // identity provider for other apps). They are managed entirely by Better
 // Auth's drizzle adapter, so:
 //   - the exported binding name must equal the plugin model name pluralized
@@ -1072,7 +1041,7 @@ export const apikeys = sqliteTable("api_keys", {
 export const rateLimitSchema = z.object({
   id: z.string(),
   userId: z.string(),
-  provider: z.enum(["github", "gitea"]).default("github"),
+  provider: z.enum(["huggingface"]).default("huggingface"),
   limit: z.number(),
   remaining: z.number(),
   used: z.number(),

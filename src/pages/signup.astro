@@ -24,15 +24,15 @@ const generator = Astro.generator;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href={withBase('/favicon.svg')} />
+    <link rel="icon" type="image/svg+xml" href={withBase('/hf-mirror.svg')} />
     <meta name="generator" content={generator} />
-    <title>Setup Admin Account - Gitea Mirror</title>
+    <title>Setup Admin Account - HF-mirror</title>
     <ThemeScript />
   </head>
   <body>
     <div class="h-dvh flex flex-col items-center justify-center bg-muted/30 p-4">
       <div class="mb-8 text-center">
-        <h1 class="text-3xl font-bold mb-2">Welcome to Gitea Mirror</h1>
+        <h1 class="text-3xl font-bold mb-2">Welcome to HF-mirror</h1>
         <p class="text-muted-foreground">Let's set up your administrator account to get started.</p>
       </div>
       <SignupPage client:load />

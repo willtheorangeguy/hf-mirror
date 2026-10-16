@@ -243,7 +243,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Fetch every repository the source can see in the organization
-    const orgRepos = await sourceProvider.listOrganizationRepositories(trimmedOrg);
+    const orgRepos = await sourceProvider.listOrganizationRepositories(trimmedOrg, config.sourceConfig?.repoTypes);
 
     const orgData: GitOrg = orgMetadata ?? {
       name: trimmedOrg,

@@ -1,13 +1,11 @@
+import { repositorySchema } from "@/lib/db/schema";
 import type { APIRoute } from "astro";
 import { db, configs, repositories } from "@/lib/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { repositoryVisibilityEnum, repoStatusEnum } from "@/types/Repository";
-import { syncGiteaRepoEnhanced } from "@/lib/gitea-enhanced";
+
 import { createSecureErrorResponse } from "@/lib/utils";
 import { requireAuthenticatedUserId } from "@/lib/auth-guards";
-import { createPreSyncBundleBackup } from "@/lib/repo-backup";
-import { decryptConfigTokens } from "@/lib/utils/config-encryption";
-import type { Config } from "@/types/config";
+
 import { createMirrorJob } from "@/lib/helpers";
 
 interface ApproveSyncRequest {
@@ -111,7 +109,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // action === "approve": create backup first (safety), then trigger sync
-    const decryptedConfig = decryptConfigTokens(config as unknown as Config);
 
     // Claim the rows before the background work starts: one conditional UPDATE
     // per repository, so the status flips to "syncing" immediately (the UI asks
@@ -157,56 +154,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     setTimeout(async () => {
       for (const repo of claimedRepos) {
         try {
-          const { getGiteaRepoOwnerAsync } = await import("@/lib/gitea");
-          const repoOwner = await getGiteaRepoOwnerAsync({ config, repository: repo });
-
-          // Always create a backup before approved sync for safety
-          const cloneUrl = `${config.giteaConfig.url.replace(/\/$/, "")}/${repoOwner}/${repo.name}.git`;
-          try {
-            const backupResult = await createPreSyncBundleBackup({
-              config,
-              owner: repoOwner,
-              repoName: repo.name,
-              cloneUrl,
-              force: true, // Bypass legacy gate — approval implies backup
-            });
-
-            await createMirrorJob({
-              userId,
-              repositoryId: repo.id,
-              repositoryName: repo.name,
-              message: `Safety snapshot created for ${repo.name}`,
-              details: `Pre-approval snapshot at ${backupResult.bundlePath}.`,
-              status: "syncing",
-            });
-          } catch (backupError) {
-            console.warn(
-              `[ApproveSync] Backup failed for ${repo.name}, proceeding with sync: ${
-                backupError instanceof Error ? backupError.message : String(backupError)
-              }`,
-            );
-          }
-
-          // Trigger sync — skip detection to avoid re-blocking
-          const repoData = {
-            ...repo,
-            status: repoStatusEnum.parse("syncing"),
-            organization: repo.organization ?? undefined,
-            lastMirrored: repo.lastMirrored ?? undefined,
-            errorMessage: repo.errorMessage ?? undefined,
-            forkedFrom: repo.forkedFrom ?? undefined,
-            visibility: repositoryVisibilityEnum.parse(repo.visibility),
-            mirroredLocation: repo.mirroredLocation || "",
-          };
-
-          await syncGiteaRepoEnhanced({
-            config,
-            repository: repoData,
-            skipForcePushDetection: true,
-            // The row was claimed above, before this background task started.
-            alreadyClaimed: true,
-          });
-          console.log(`[ApproveSync] Sync completed for approved repository: ${repo.name}`);
+          const { pushMirrorRepository } = await import("@/lib/push-engine/mirror");
+          await pushMirrorRepository({ config, repository: repositorySchema.parse({ ...repo, mirroredLocation: repo.mirroredLocation ?? "" }), mode: "sync", approved: true });
         } catch (error) {
           console.error(
             `[ApproveSync] Failed to sync approved repository ${repo.name}:`,

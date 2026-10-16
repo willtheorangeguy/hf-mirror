@@ -1,105 +1,27 @@
-# Gitea Mirror deployment configuration
-# Standard deployment with automatic database maintenance
-
 services:
-  gitea-mirror:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE:-raylabshq/gitea-mirror}:${DOCKER_TAG:-latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
-      platforms:
-        - linux/amd64
-        - linux/arm64
-      cache_from:
-        - ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE:-raylabshq/gitea-mirror}:${DOCKER_TAG:-latest}
-    container_name: gitea-mirror
+  hf-mirror:
+    build: .
+    image: hf-mirror:local
+    container_name: hf-mirror
     restart: unless-stopped
     ports:
-      - "4321:4321"
+      - "${PORT:-4321}:4321"
     volumes:
-      - gitea-mirror-data:/app/data
-      # Mount custom CA certificates - choose one option:
-      # Option 1: Mount individual CA certificates from certs directory
-      # - ./certs:/app/certs:ro
-      # Option 2: Mount system CA bundle (if your CA is already in system store)
-      # - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+      - ./data:/app/data
     environment:
-      # For a complete list of all supported environment variables, see:
-      # docs/ENVIRONMENT_VARIABLES.md or .env.example
-      - NODE_ENV=production
-      - DATABASE_URL=file:data/gitea-mirror.db
-      - HOST=0.0.0.0
-      - PORT=4321
-      - BASE_URL=${BASE_URL:-/}
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-your-secret-key-change-this-in-production}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:4321}
-      # REVERSE PROXY: If you access Gitea Mirror through a reverse proxy (e.g. Nginx, Caddy, Traefik),
-      # you MUST set these three variables to your external URL. Example:
-      #   BETTER_AUTH_URL=https://gitea-mirror.example.com
-      #   PUBLIC_BETTER_AUTH_URL=https://gitea-mirror.example.com
-      #   BETTER_AUTH_TRUSTED_ORIGINS=https://gitea-mirror.example.com
-      # If deployed under a path prefix (e.g. https://git.example.com/mirror), also set:
-      #   BASE_URL=/mirror
-      #   BETTER_AUTH_URL=https://git.example.com
-      #   PUBLIC_BETTER_AUTH_URL=https://git.example.com
-      #   BETTER_AUTH_TRUSTED_ORIGINS=https://git.example.com
-      - PUBLIC_BETTER_AUTH_URL=${PUBLIC_BETTER_AUTH_URL:-http://localhost:4321}
-      - BETTER_AUTH_TRUSTED_ORIGINS=${BETTER_AUTH_TRUSTED_ORIGINS:-}
-      # Optional: ENCRYPTION_SECRET will be auto-generated if not provided
-      # - ENCRYPTION_SECRET=${ENCRYPTION_SECRET:-}
-      # GitHub/Gitea Mirror Config
-      - GITHUB_USERNAME=${GITHUB_USERNAME:-}
-      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - GITHUB_EXCLUDED_ORGS=${GITHUB_EXCLUDED_ORGS:-}
-      - SKIP_FORKS=${SKIP_FORKS:-false}
-      - PRIVATE_REPOSITORIES=${PRIVATE_REPOSITORIES:-false}
-      - MIRROR_ISSUES=${MIRROR_ISSUES:-false}
-      - MIRROR_WIKI=${MIRROR_WIKI:-false}
-      - MIRROR_STARRED=${MIRROR_STARRED:-false}
-      - MIRROR_ORGANIZATIONS=${MIRROR_ORGANIZATIONS:-false}
-      - PRESERVE_ORG_STRUCTURE=${PRESERVE_ORG_STRUCTURE:-false}
-      - ONLY_MIRROR_ORGS=${ONLY_MIRROR_ORGS:-false}
-      - SKIP_STARRED_ISSUES=${SKIP_STARRED_ISSUES:-false}
-      - MIRROR_ISSUE_CONCURRENCY=${MIRROR_ISSUE_CONCURRENCY:-3}
-      - MIRROR_PULL_REQUEST_CONCURRENCY=${MIRROR_PULL_REQUEST_CONCURRENCY:-5}
-      - GITEA_URL=${GITEA_URL:-}
-      - GITEA_TOKEN=${GITEA_TOKEN:-}
-      - GITEA_USERNAME=${GITEA_USERNAME:-}
-      - GITEA_ORGANIZATION=${GITEA_ORGANIZATION:-github-mirrors}
-      - GITEA_ORG_VISIBILITY=${GITEA_ORG_VISIBILITY:-public}
-      - DELAY=${DELAY:-3600}
-      # Scheduling and Sync Configuration (Issue #72 fixes)
-      - SCHEDULE_ENABLED=${SCHEDULE_ENABLED:-false}
-      - GITEA_MIRROR_INTERVAL=${GITEA_MIRROR_INTERVAL:-8h}
-      - AUTO_IMPORT_REPOS=${AUTO_IMPORT_REPOS:-true}
-      - AUTO_MIRROR_REPOS=${AUTO_MIRROR_REPOS:-false}
-      # Repository Cleanup Configuration
-      - CLEANUP_DELETE_IF_NOT_IN_GITHUB=${CLEANUP_DELETE_IF_NOT_IN_GITHUB:-false}
-      - CLEANUP_ORPHANED_REPO_ACTION=${CLEANUP_ORPHANED_REPO_ACTION:-archive}
-      - CLEANUP_DRY_RUN=${CLEANUP_DRY_RUN:-true}
-      # Optional: Skip TLS verification (insecure, use only for testing)
-      # - GITEA_SKIP_TLS_VERIFY=${GITEA_SKIP_TLS_VERIFY:-false}
-      # Login page: which tab opens first when both methods are available
-      - AUTH_DEFAULT_METHOD=${AUTH_DEFAULT_METHOD:-email}
-      - AUTH_ALLOW_SIGNUP=${AUTH_ALLOW_SIGNUP:-false}
-      # Header Authentication (for Reverse Proxy SSO)
-      - HEADER_AUTH_ENABLED=${HEADER_AUTH_ENABLED:-false}
-      - HEADER_AUTH_USER_HEADER=${HEADER_AUTH_USER_HEADER:-X-Authentik-Username}
-      - HEADER_AUTH_EMAIL_HEADER=${HEADER_AUTH_EMAIL_HEADER:-X-Authentik-Email}
-      - HEADER_AUTH_NAME_HEADER=${HEADER_AUTH_NAME_HEADER:-X-Authentik-Name}
-      - HEADER_AUTH_AUTO_PROVISION=${HEADER_AUTH_AUTO_PROVISION:-false}
-      - HEADER_AUTH_ALLOWED_DOMAINS=${HEADER_AUTH_ALLOWED_DOMAINS:-}
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "BASE=\"${BASE_URL:-/}\"; if [ \"$${BASE}\" = \"/\" ]; then BASE=\"\"; else BASE=\"$${BASE%/}\"; fi; wget --no-verbose --tries=3 --spider \"http://localhost:4321$${BASE}/api/health\"",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 15s
-
-# Define named volumes for database persistence
-volumes:
-  gitea-mirror-data:    # Database volume
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4321
+      DATABASE_URL: file:data/hf-mirror.db
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4321}
+      PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4321}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_URL:-http://localhost:4321}
+      HF_USERNAME: ${HF_USERNAME:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+      SOURCE_URL: ${SOURCE_URL:-https://huggingface.co}
+      GITEA_URL: ${GITEA_URL:-}
+      GITEA_USERNAME: ${GITEA_USERNAME:-}
+      GITEA_TOKEN: ${GITEA_TOKEN:-}
+      GITEA_LFS: ${GITEA_LFS:-true}
+      PUSH_CONCURRENCY: ${PUSH_CONCURRENCY:-2}

@@ -8,6 +8,15 @@
  * of the repository directory.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
+const cancellation = new AsyncLocalStorage<AbortSignal>();
+export const currentGitSignal = () => cancellation.getStore();
+export const withGitCancellation = <T>(signal: AbortSignal, action: () => Promise<T>) => cancellation.run(signal, action);
+
+export class MirrorCancelledError extends Error {
+  constructor() { super("Mirror cancelled by user"); this.name = "MirrorCancelledError"; }
+}
+
 export interface GitCredentials {
   username: string;
   token: string;
@@ -15,6 +24,7 @@ export interface GitCredentials {
 
 export interface RunGitOptions {
   cwd?: string;
+  onProgress?: (message: string) => void;
   /** Credentials for the http(s) remote this command talks to, if any. */
   credentials?: GitCredentials | null;
   /** Kill the process after this long. Defaults to one hour: first clones can be big. */
@@ -40,8 +50,8 @@ export class GitCommandError extends Error {
 
 const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
 
-const CREDENTIAL_USER_ENV = "GITEA_MIRROR_GIT_USERNAME";
-const CREDENTIAL_TOKEN_ENV = "GITEA_MIRROR_GIT_TOKEN";
+const CREDENTIAL_USER_ENV = "HF_MIRROR_GIT_USERNAME";
+const CREDENTIAL_TOKEN_ENV = "HF_MIRROR_GIT_TOKEN";
 
 /**
  * The helper git runs to obtain credentials. A helper starting with "!" is
@@ -61,6 +71,8 @@ export function credentialArgs(credentials?: GitCredentials | null): string[] {
     // Never fall back to a terminal or GUI prompt: fail instead of hanging.
     "-c",
     "core.askPass=",
+    "-c", "core.hooksPath=/dev/null",
+    "-c", "credential.helper=",
   ];
   if (credentials) {
     // An empty value resets the helper list, so a global helper (keychain,
@@ -77,6 +89,7 @@ export async function runGit(args: string[], options: RunGitOptions = {}): Promi
     ...process.env,
     GIT_TERMINAL_PROMPT: "0",
     LC_ALL: "C",
+    GIT_LFS_FORCE_PROGRESS: "1",
   };
   if (credentials) {
     env[CREDENTIAL_USER_ENV] = credentials.username;
@@ -86,6 +99,8 @@ export async function runGit(args: string[], options: RunGitOptions = {}): Promi
     delete env[CREDENTIAL_TOKEN_ENV];
   }
 
+  const signal = cancellation.getStore();
+  signal?.throwIfAborted();
   const fullArgs = [...credentialArgs(credentials), ...args];
   // The kill timer lives in the runtime, not in a JS timer: the test setup
   // replaces setTimeout with an immediate call, which would kill every git
@@ -98,14 +113,16 @@ export async function runGit(args: string[], options: RunGitOptions = {}): Promi
     stdout: "pipe",
     stderr: "pipe",
     timeout: timeoutMs,
+    signal,
     killSignal: "SIGTERM",
   });
 
   const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    readGitOutput(proc.stdout, options.onProgress, credentials?.token),
+    readGitOutput(proc.stderr, options.onProgress, credentials?.token),
     proc.exited,
   ]);
+  signal?.throwIfAborted();
   const token = credentials?.token;
   const safeStdout = maskSecret(stdout, token);
   const safeStderr = maskSecret(stderr, token);
@@ -129,6 +146,26 @@ export async function runGit(args: string[], options: RunGitOptions = {}): Promi
     );
   }
   return { stdout: safeStdout, stderr: safeStderr };
+}
+
+async function readGitOutput(stream: ReadableStream<Uint8Array>, progress?: (message: string) => void, secret?: string): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let output = "";
+  let pending = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    output += chunk;
+    pending += chunk;
+    const lines = pending.split(/[\r\n]+/);
+    pending = lines.pop() ?? "";
+    if (progress && lines.length) progress(maskSecret(lines.at(-1)!.slice(-500), secret));
+  }
+  output += decoder.decode();
+  if (progress && pending.trim()) progress(maskSecret(pending.slice(-500), secret));
+  return output;
 }
 
 /**

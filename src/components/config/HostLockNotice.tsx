@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface HostLockNoticeProps {
-  /** One line shown next to the lock icon, e.g. "12 repositories imported from GitHub". */
+  /** One line shown next to the lock icon, e.g. "12 repositories imported from Hugging Face". */
   summary: string;
   /** Dialog title, e.g. "Change the source?". */
   title: string;

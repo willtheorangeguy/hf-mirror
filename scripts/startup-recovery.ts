@@ -27,7 +27,7 @@ if (isNaN(timeout) || timeout < 1000) {
 }
 
 async function runStartupRecovery() {
-  console.log('=== Gitea Mirror Startup Recovery ===');
+  console.log('=== HF-mirror Startup Recovery ===');
   console.log(`Timeout: ${timeout}ms`);
   console.log(`Force recovery: ${forceRecovery}`);
   console.log('');
@@ -101,17 +101,17 @@ async function runStartupRecovery() {
     if (error instanceof Error && error.message.includes('timeout')) {
       console.error(`❌ Recovery timed out after ${duration}ms`);
       console.error('Application will start anyway, but some jobs may remain interrupted.');
-      
+
       // Get current recovery status
       const status = getRecoveryStatus();
       console.log('Recovery status:', status);
-      
+
       // Exit with warning code but allow startup to continue
       process.exit(1);
     } else {
       console.error(`❌ Recovery failed after ${duration}ms:`, error);
       console.error('Application will start anyway, but recovery was unsuccessful.');
-      
+
       // Exit with error code but allow startup to continue
       process.exit(1);
     }

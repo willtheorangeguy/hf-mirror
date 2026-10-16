@@ -34,8 +34,8 @@ export function Header({ currentPage, onNavigate, onMenuClick, onToggleCollapse,
     }
     if (!isFullyConfigured) {
       return isLiveEnabled
-        ? 'Live refresh enabled but requires GitHub and Gitea configuration to function'
-        : 'Enable live refresh (requires GitHub and Gitea configuration)';
+        ? 'Live refresh enabled but requires Hugging Face and Gitea configuration to function'
+        : 'Enable live refresh (requires Hugging Face and Gitea configuration)';
     }
     return isLiveEnabled ? 'Disable live refresh' : 'Enable live refresh';
   };
@@ -68,7 +68,7 @@ export function Header({ currentPage, onNavigate, onMenuClick, onToggleCollapse,
             )}
             <span className="sr-only">Toggle menu</span>
           </Button>
-          
+
           {/* Sidebar Collapse Toggle - Only on medium screens (768px - 1280px) */}
           <Button
             variant="ghost"
@@ -84,7 +84,7 @@ export function Header({ currentPage, onNavigate, onMenuClick, onToggleCollapse,
             )}
             <span className="sr-only">Toggle sidebar</span>
           </Button>
-          
+
           <button
             onClick={() => {
               if (currentPage !== 'dashboard') {
@@ -95,11 +95,11 @@ export function Header({ currentPage, onNavigate, onMenuClick, onToggleCollapse,
             className="flex items-center gap-2 py-1 hover:opacity-80 transition-opacity"
           >
             <img
-              src={withBase('/logo.png')}
-              alt="Gitea Mirror Logo"
+              src={withBase('/hf-mirror.svg')}
+              alt="HF-mirror Logo"
               className="h-5 w-6"
             />
-            <span className="text-xl font-bold hidden sm:inline">Gitea Mirror</span>
+            <span className="text-xl font-bold hidden sm:inline">HF-mirror</span>
           </button>
         </div>
 

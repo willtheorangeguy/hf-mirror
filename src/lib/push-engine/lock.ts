@@ -75,7 +75,12 @@ export async function withCloneLock<T>(
   let taken = await tryTakeLock(lockPath);
   if (!taken) {
     const age = await lockAge(lockPath);
-    if (age && age.ageMs > staleAfterMs) {
+    let ownerAlive = false;
+    try {
+      const owner = JSON.parse(await readFile(lockPath, "utf8")) as { pid?: number };
+      if (owner.pid) { process.kill(owner.pid, 0); ownerAlive = true; }
+    } catch { /* Missing process or unreadable stale lock. */ }
+    if (age && age.ageMs > staleAfterMs && !ownerAlive) {
       await rm(lockPath, { force: true });
       taken = await tryTakeLock(lockPath);
     }

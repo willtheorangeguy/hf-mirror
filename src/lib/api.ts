@@ -30,77 +30,28 @@ async function apiRequest<T>(
   return response.json();
 }
 
-// Auth API
-export const authApi = {
-  login: async (username: string, password: string) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include", // Send cookies
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!res.ok) throw new Error("Login failed");
-    return await res.json(); // returns user
-  },
-
-  register: async (username: string, email: string, password: string) => {
-    const res = await fetch(`${API_BASE}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ username, email, password }),
-    });
-
-    if (!res.ok) throw new Error("Registration failed");
-    return await res.json(); // returns user
-  },
-
-  getCurrentUser: async () => {
-    const res = await fetch(`${API_BASE}/auth`, {
-      method: "GET",
-      credentials: "include", // Send cookies
-    });
-
-    if (!res.ok) throw new Error("Not authenticated");
-    return await res.json();
-  },
-
-  logout: async () => {
-    await fetch(`${API_BASE}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-  },
-};
-
-// GitHub API
-export const githubApi = {
+export const sourceApi = {
   /** Test the source connection. The route serves every source provider. */
   testConnection: (
     token: string,
     options: { provider?: SourceProvider; url?: string; username?: string } = {}
   ) =>
-    apiRequest<{ success: boolean; message?: string }>("/github/test-connection", {
+    apiRequest<{ success: boolean; message?: string }>("/source/test-connection", {
       method: "POST",
       body: JSON.stringify({ token, ...options }),
-    }),
-  getStarredLists: () =>
-    apiRequest<{ success: boolean; lists: string[] }>("/github/starred-lists", {
-      method: "GET",
     }),
 };
 
 // Gitea API
 export interface GiteaServerInfo {
-  type: "forgejo" | "gitea" | "github" | "gitlab";
+  type: "forgejo" | "gitea";
   version: string;
   raw: string;
   hasMirrorCredBug: boolean;
 }
 
 export const giteaApi = {
-  /** Test the destination connection. The route serves Gitea, Forgejo, GitHub and GitLab. */
+
   testConnection: (
     url: string,
     token: string,

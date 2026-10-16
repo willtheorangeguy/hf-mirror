@@ -81,8 +81,8 @@ export async function testNotification(
   notificationConfig: NotificationConfig,
 ): Promise<{ success: boolean; error?: string }> {
   const event: NotificationEvent = {
-    title: "Gitea Mirror - Test Notification",
-    message: "This is a test notification from Gitea Mirror. If you see this, notifications are working correctly!",
+    title: "HF-mirror - Test Notification",
+    message: "This is a test notification from HF-mirror. If you see this, notifications are working correctly!",
     type: "sync_success",
   };
 

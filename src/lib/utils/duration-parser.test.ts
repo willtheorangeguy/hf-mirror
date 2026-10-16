@@ -79,7 +79,7 @@ test('parseCronInterval - handles common cron patterns', () => {
 });
 
 test('Integration test - Issue #72 scenario', () => {
-  // User sets GITEA_MIRROR_INTERVAL=8h
+  // User sets SCHEDULE_INTERVAL=8h
   const userInterval = '8h';
   const parsedMs = parseInterval(userInterval);
   
