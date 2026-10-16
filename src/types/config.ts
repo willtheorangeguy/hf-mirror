@@ -18,6 +18,8 @@ export interface GiteaConfig {
   username: string;
   token: string;
   organization: string;
+  /** Optional default organization for all HF mirrors, including liked repositories. */
+  hfReposOrg?: string;
   visibility: GiteaOrgVisibility;
   starredReposOrg: string;
   starredReposMode?: StarredReposMode;

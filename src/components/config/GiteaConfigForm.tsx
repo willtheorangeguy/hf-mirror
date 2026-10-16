@@ -383,6 +383,28 @@ export function GiteaConfigForm({ config, setConfig, onAutoSave, isAutoSaving, s
               {`Create one in ${providerLabel} under Settings → Applications`}
             </p>
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="hf-repos-org" className="text-xs font-medium text-muted-foreground">
+              HF repositories organization (optional)
+            </Label>
+            <Input
+              id="hf-repos-org"
+              name="hfReposOrg"
+              type="text"
+              value={config.hfReposOrg || ""}
+              onChange={handleChange}
+              placeholder="hf-mirrors"
+              aria-describedby="hf-repos-org-help"
+            />
+            <p id="hf-repos-org-help" className="text-[11px] text-muted-foreground/80">
+              Put new HF mirrors, including liked repositories, in this {providerLabel} organization.
+              Your token needs permission to create repositories there. A missing organization is
+              created when organization creation is enabled. Repository and source organization
+              overrides take priority. Existing mirrors keep their current locations.
+              Leave blank to use Organization Structure settings.
+            </p>
+          </div>
         </CardSection>
       </SettingsCard>
     );

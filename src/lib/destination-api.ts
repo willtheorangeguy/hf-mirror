@@ -30,11 +30,14 @@ export function getGiteaRepoOwner({ config, repository, sourceUsername }: {
   }
   const source = config.sourceConfig;
   const destination = config.giteaConfig;
+  if (repository.destinationOrg) return repository.destinationOrg;
+  // Explicit repository/organization overrides win; this default also covers likes.
+  const hfReposOrg = destination.hfReposOrg?.trim();
+  if (repository.sourceProvider === "huggingface" && hfReposOrg) return hfReposOrg;
   if (repository.isStarred) {
     return source.starredReposMode === "preserve-owner"
       ? repository.organization || repository.owner : source.starredReposOrg || "liked";
   }
-  if (repository.destinationOrg) return repository.destinationOrg;
   const strategy = source.mirrorStrategy || (destination.preserveOrgStructure ? "preserve" : "flat-user");
   if (strategy === "preserve") {
     if (repository.organization) return repository.organization;

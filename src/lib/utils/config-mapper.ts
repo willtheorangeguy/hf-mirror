@@ -126,6 +126,9 @@ export function mapUiToDbConfig(
     token: giteaConfig.token,
     defaultOwner: giteaConfig.username, // Map username to defaultOwner
     organization: giteaConfig.organization, // Add organization field
+    hfReposOrg: giteaConfig.hfReposOrg === undefined
+      ? existing?.giteaConfig?.hfReposOrg
+      : giteaConfig.hfReposOrg.trim(),
     preserveOrgStructure: giteaConfig.mirrorStrategy === "preserve" || giteaConfig.mirrorStrategy === "mixed", // Add preserveOrgStructure field
 
     // Mirror interval — not in UI; preserve the stored value so a save doesn't
@@ -218,6 +221,7 @@ export function mapDbToUiConfig(dbConfig: any): {
     username: dbConfig.giteaConfig?.defaultOwner || "", // Map defaultOwner to username
     token: dbConfig.giteaConfig?.token || "",
     organization: dbConfig.sourceConfig?.defaultOrg || "hf-mirrors",
+    hfReposOrg: dbConfig.giteaConfig?.hfReposOrg || "",
     visibility: dbConfig.giteaConfig?.visibility === "default" ? "public" : dbConfig.giteaConfig?.visibility || "public",
     starredReposOrg: dbConfig.sourceConfig?.starredReposOrg || "starred",
     starredReposMode: dbConfig.sourceConfig?.starredReposMode || "dedicated-org",

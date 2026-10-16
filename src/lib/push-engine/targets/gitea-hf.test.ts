@@ -27,3 +27,59 @@ test("does not loop forever when repository creation is rejected", async () => {
   await expect(target.ensureRepository({ owner: "me", name: "invalid", isPrivate: true, description: marker })).rejects.toThrow("422");
   expect(creates).toBe(1);
 });
+
+test("creates HF repositories in an existing organization", async () => {
+  const requests: string[] = [];
+  globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    const route = new URL(String(url)).pathname;
+    requests.push(`${init?.method ?? "GET"} ${route}`);
+    if (route === "/api/v1/orgs/hf-backups") return Response.json({ username: "hf-backups" });
+    if (init?.method === "POST" && route === "/api/v1/orgs/hf-backups/repos") {
+      const body = JSON.parse(String(init.body));
+      expect(body.private).toBe(true);
+      expect(body.description).toBe(marker);
+      return Response.json({ ...body, owner: { login: "hf-backups" }, html_url: "https://forge.example/hf-backups/model" });
+    }
+    return Response.json({}, { status: 404 });
+  }) as typeof fetch;
+  const repo = await target.ensureRepository({ owner: "hf-backups", name: "model", isPrivate: true, description: marker });
+  expect(repo.owner).toBe("hf-backups");
+  expect(repo.pushUrl).toBe("https://forge.example/hf-backups/model.git");
+  expect(requests).toEqual([
+    "GET /api/v1/repos/hf-backups/model", "GET /api/v1/orgs/hf-backups", "POST /api/v1/orgs/hf-backups/repos",
+  ]);
+});
+
+test("surfaces denied organization permissions without falling back to a personal repository", async () => {
+  const requests: string[] = [];
+  globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    const route = new URL(String(url)).pathname;
+    requests.push(route);
+    if (route === "/api/v1/orgs/hf-backups") return Response.json({ username: "hf-backups" });
+    return Response.json({}, { status: init?.method === "POST" ? 403 : 404 });
+  }) as typeof fetch;
+  await expect(target.ensureRepository({ owner: "hf-backups", name: "model", isPrivate: true, description: marker })).rejects.toThrow("403");
+  expect(requests).not.toContain("/api/v1/user/repos");
+});
+
+test("creates a missing organization before its HF repository", async () => {
+  const requests: string[] = [];
+  globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    const route = new URL(String(url)).pathname;
+    requests.push(`${init?.method ?? "GET"} ${route}`);
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      if (route === "/api/v1/orgs") {
+        expect(body).toEqual({ username: "hf-backups", visibility: "private" });
+        return Response.json(body);
+      }
+      return Response.json({ ...body, owner: { login: "hf-backups" } });
+    }
+    return Response.json({}, { status: 404 });
+  }) as typeof fetch;
+  await target.ensureRepository({ owner: "hf-backups", name: "model", isPrivate: true, description: marker });
+  expect(requests).toEqual([
+    "GET /api/v1/repos/hf-backups/model", "GET /api/v1/orgs/hf-backups",
+    "POST /api/v1/orgs", "POST /api/v1/orgs/hf-backups/repos",
+  ]);
+});

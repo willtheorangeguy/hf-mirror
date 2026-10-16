@@ -339,6 +339,7 @@ export async function initializeConfigFromEnv(): Promise<void> {
       token: envConfig.gitea.token ? encrypt(envConfig.gitea.token) : existingConfig?.[0]?.giteaConfig?.token || '',
       defaultOwner: envConfig.gitea.username || existingConfig?.[0]?.giteaConfig?.defaultOwner || '',
       organization: envConfig.gitea.organization || existingConfig?.[0]?.giteaConfig?.organization || undefined,
+      hfReposOrg: existingConfig?.[0]?.giteaConfig?.hfReposOrg,
       preserveOrgStructure: mirrorStrategy === 'preserve' || mirrorStrategy === 'mixed',
       mirrorInterval: envConfig.gitea.mirrorInterval || existingConfig?.[0]?.giteaConfig?.mirrorInterval || '8h',
       lfs: envConfig.gitea.lfs ?? existingConfig?.[0]?.giteaConfig?.lfs ?? false,

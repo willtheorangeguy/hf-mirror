@@ -80,6 +80,9 @@ export const giteaConfigSchema = z.object({
   token: z.string(),
   defaultOwner: z.string(),
   organization: z.string().optional(),
+  hfReposOrg: z.string().trim()
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$|^$/, "Enter an organization name, not a URL or path")
+    .optional(),
   mirrorInterval: z.string().default("8h"),
   lfs: z.boolean().default(true),
   wiki: z.boolean().default(false),

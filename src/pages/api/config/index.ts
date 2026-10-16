@@ -28,7 +28,7 @@ import { encrypt, decrypt } from "@/lib/utils/encryption";
 import { createDefaultConfig } from "@/lib/utils/config-defaults";
 import { requireAuthenticatedUserId } from "@/lib/auth-guards";
 import { blockedOutboundUrlReason } from "@/lib/utils/outbound-url";
-import { notificationConfigSchema } from "@/lib/db/schema";
+import { giteaConfigSchema, notificationConfigSchema } from "@/lib/db/schema";
 import {
   loadSourceApiItems,
   type SourceApiItem,
@@ -73,6 +73,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
           headers: { "Content-Type": "application/json" },
         }
       );
+    }
+
+    if (giteaConfig.hfReposOrg !== undefined) {
+      const parsed = giteaConfigSchema.shape.hfReposOrg.safeParse(giteaConfig.hfReposOrg);
+      if (!parsed.success) {
+        return Response.json({ success: false, message: "Invalid HF repositories organization: enter an organization name, not a URL or path" }, { status: 400 });
+      }
+      giteaConfig.hfReposOrg = parsed.data;
     }
 
     let validatedNotificationConfig: any = undefined;
