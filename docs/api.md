@@ -1,9 +1,9 @@
-# HF Mirror — API
+# API
 
 Astro serves application routes under `/api`. Prepend the deployed `BASE_URL`
 when present. This is the application's own API, not the HF Hub API or the forge
 API. There is no generated OpenAPI specification or versioned `/v1` prefix.
-The source of truth is [src/pages/api](../src/pages/api/).
+The source of truth is [src/pages/api](https://github.com/willtheorangeguy/hf-mirror/tree/HEAD/src/pages/api/).
 
 ## Authentication and responses
 
@@ -66,8 +66,8 @@ Configuration uses nested `sourceConfig`, `giteaConfig`, `scheduleConfig`,
 `cleanupConfig`, `notificationConfig`, and mirror options. UI fields such as
 source `username` and destination `username` map to database `owner` and
 `defaultOwner`; do not send a raw database row as a save request. Consult
-[config types](../src/types/config.ts) and the
-[configuration handler](../src/pages/api/config/index.ts) for full payloads.
+[config types](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/types/config.ts) and the
+[configuration handler](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/pages/api/config/index.ts) for full payloads.
 Use the UI confirmation flow for identity changes rather than guessing flags.
 
 ## Mirror jobs

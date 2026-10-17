@@ -46,3 +46,15 @@ tests/e2e/playwright-report/
 # Local HF-mirror validation artifacts
 .hf-*.log
 .cache/
+
+# Documentation build artifacts (staged by the shared MkDocs workflow)
+site/
+_docs_out/
+_site/
+.mkdocs-shared/
+docs/stylesheets/
+docs/javascript/
+docs/images/favicon.svg
+overrides/main.html
+overrides/partials/
+overrides/.icons/

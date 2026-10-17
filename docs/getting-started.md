@@ -1,10 +1,24 @@
-# HF Mirror — Quickstart
+# Getting started
 
 This path uses a published container on a Linux Docker host. You need Docker
 with Compose, OpenSSL, an existing Gitea instance with LFS enabled, and credentials
 for your repositories. Other paths are in [installation](./installation.md).
 
-## Deploy
+## Prerequisites
+
+Check your tools before starting:
+
+```bash
+docker --version
+docker compose version
+openssl version
+```
+
+The published images support Linux amd64 and arm64. Your Gitea account needs
+repository and organization write access. The HF account must already have
+permission to any private or gated content.
+
+## Install
 
 1. Download `docker-compose.yml` and `env.example` from a
    [release](https://github.com/willtheorangeguy/hf-mirror/releases/latest) into an empty directory.
@@ -35,7 +49,7 @@ registration closes after an account exists unless explicitly enabled. A working
 installation displays the dashboard. `/api/health` returns JSON containing the
 database and recovery status.
 
-## Back up one repository
+## First run
 
 1. Open **Configuration** and add a Hugging Face source. Use your HF account name
    and a token with read access to the repositories you need. A gated repository
@@ -52,10 +66,18 @@ database and recovery status.
 5. Watch activity and repository progress. The status should progress
    from `imported` through `mirroring` to `mirrored`.
 
+## What just happened
+
+Discovery created a tracked repository row. The mirror job fetched the source
+into a persistent clone, transferred selected content, verified the destination,
+and archived metadata.
+
 Confirm that the destination contains the expected branches and tags, and that
 large-file backup reports completion. Selected HF discussions and PRs appear as
 issues; the JSON archive preserves source metadata. A Git-only backup excludes
 large files.
+
+## Next steps
 
 Preserve `data/` and its hidden secret files across restarts. Before adding large
 models or enabling a schedule, read [usage](./usage.md),

@@ -1,0 +1,47 @@
+# Shared theme, plugins, extensions, and build logic live in willtheorangeguy/mkdocs.
+INHERIT: .mkdocs-shared/shared/mkdocs.base.yml
+
+site_name: HF Mirror
+site_description: Back up Hugging Face models, datasets, and Spaces to Gitea or Forgejo through a web interface.
+site_author: willtheorangeguy
+site_url: https://williamvdg.me/hf-mirror/
+
+repo_url: https://github.com/willtheorangeguy/hf-mirror
+repo_name: willtheorangeguy/hf-mirror
+edit_uri: edit/main/docs/
+
+copyright: HF Mirror contributors. Based on Gitea Mirror by RayLabsHQ. GNU AGPLv3.
+
+nav:
+  - HF Mirror: index.md
+  - Getting started: getting-started.md
+  - Installation: installation.md
+  - Usage: usage.md
+  - Configuration:
+      - Configuration: configuration.md
+      - Authentication: authentication.md
+      - Notifications: notifications.md
+  - Operations:
+      - Deployment: deployment.md
+      - Backup and restore: backup-restore.md
+      - Troubleshooting: troubleshooting.md
+      - FAQ: faq.md
+  - Reference:
+      - Architecture: architecture.md
+      - API: api.md
+      - Commands: commands.md
+      - Roadmap and limitations: roadmap.md
+  - Development:
+      - Development: development.md
+      - Testing: testing.md
+      - CI/CD: ci-cd.md
+      - Documentation: documentation.md
+  - About:
+      - Attribution: attribution.md
+      - License: license.md
+      - Contributing: https://github.com/willtheorangeguy/.github/blob/main/CONTRIBUTING.md
+      - Code of conduct: https://github.com/willtheorangeguy/.github/blob/main/CODE_OF_CONDUCT.md
+      - Security: https://github.com/willtheorangeguy/.github/blob/main/SECURITY.md
+
+exclude_docs: |
+  docs.instructions.md

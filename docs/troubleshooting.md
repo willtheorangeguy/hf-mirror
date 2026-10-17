@@ -1,4 +1,4 @@
-# HF Mirror — Troubleshooting
+# Troubleshooting
 
 Start with `docker compose ps`, `docker compose logs --tail=100 hf-mirror`, the
 repository's error/progress, and `/api/health` JSON. Include override files in

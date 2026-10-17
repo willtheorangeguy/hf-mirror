@@ -1,6 +1,6 @@
-# HF Mirror — Usage
+# Usage
 
-Complete [quickstart](./quickstart.md) before expanding discovery or scheduling.
+Complete [quickstart](./getting-started.md) before expanding discovery or scheduling.
 The dashboard, repositories, organizations, activity, and configuration pages
 share your signed-in account's configuration and records.
 

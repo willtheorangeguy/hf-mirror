@@ -73,11 +73,11 @@ Open your configured address, create the first account, and configure a Hugging
 Face source plus your Gitea destination. Test both connections, add a small
 repository by URL, and select **Mirror**. A successful transfer reaches
 `mirrored`; check its large-file status before treating it as a complete backup.
-See the [quickstart](docs/quickstart.md) for a full first-run walkthrough.
+See the [quickstart](docs/getting-started.md) for a full first-run walkthrough.
 
 ## Documentation
 
-Full documentation lives in [`docs/`](docs/README.md):
+Full documentation lives in [`docs/`](docs/index.md):
 [Installation](docs/installation.md) · [Usage](docs/usage.md) · [Configuration](docs/configuration.md) · [Troubleshooting](docs/troubleshooting.md)
 
 Operations: [Deployment](docs/deployment.md) · [Backup and restore](docs/backup-restore.md) · [Authentication](docs/authentication.md) · [API](docs/api.md).

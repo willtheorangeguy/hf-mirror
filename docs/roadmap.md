@@ -1,4 +1,4 @@
-# HF Mirror — Roadmap and Limitations
+# Roadmap and limitations
 
 This page records boundaries visible in the current implementation. It is not
 a promise of future work or a release schedule. Proposals belong in the project's
@@ -13,8 +13,8 @@ gitea-mirror features for other source or destination providers are not implicit
 available here. New providers require explicit adapters, identity handling,
 credentials, and tests.
 
-Evidence: [source kinds](../src/lib/source-providers/kinds.ts),
-[destination kinds](../src/lib/destination-kinds.ts).
+Evidence: [source kinds](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/source-providers/kinds.ts),
+[destination kinds](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/destination-kinds.ts).
 
 ## Archive fidelity
 
@@ -27,7 +27,7 @@ PR conversations are copied as issues, not native forge PRs. Authors and source
 timestamps are represented in text rather than impersonating original accounts.
 Inherited wiki, release, label, and milestone settings are not separate HF export
 pipelines; the registry marks no HF release capability. See
-[metadata implementation](../src/lib/hf-metadata.ts).
+[metadata implementation](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/hf-metadata.ts).
 
 Large-file completeness depends on source permissions and Git LFS-compatible
 delivery of the referenced payloads. Destination verification checks advertised

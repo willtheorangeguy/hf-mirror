@@ -48,6 +48,12 @@ docker-compose.*.yml
 # Documentation
 README.md
 docs
+mkdocs.yml
+.mkdocs-shared
+overrides
+site
+_docs_out
+_site
 
 # Temporary files
 tmp
