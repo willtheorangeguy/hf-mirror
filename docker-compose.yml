@@ -1,7 +1,6 @@
 services:
   hf-mirror:
-    build: .
-    image: hf-mirror:local
+    image: ghcr.io/willtheorangeguy/hf-mirror:${HF_MIRROR_VERSION:-latest}
     container_name: hf-mirror
     restart: unless-stopped
     ports:
