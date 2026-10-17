@@ -6,6 +6,9 @@ import node from '@astrojs/node';
 
 // https://astro.build/config
 export default defineConfig({
+  server: {
+    port: 5321,
+  },
   output: 'server',
   adapter: node({
     mode: 'standalone',

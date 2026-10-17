@@ -18,8 +18,8 @@ openssl rand -hex 32
 
 Edit `.env`: set `BETTER_AUTH_SECRET` to the generated value and
 `BETTER_AUTH_URL` to the address you will use to access the app, such as
-`https://mirror.example.com` or `http://192.168.1.10:4321`.
-Set `PORT` if you want a host port other than 4321. Configure Hugging Face
+`https://mirror.example.com` or `http://192.168.1.10:5321`.
+Set `PORT` if you want a host port other than 5321. Configure Hugging Face
 and Gitea credentials in `.env` or through the web interface.
 
 ```sh
@@ -38,6 +38,14 @@ to the desired release tag in `.env`, then run `docker compose pull` and
 `docker compose up -d` again. The Compose file in the repository defaults to
 `latest`, which tracks stable releases. Prereleases have their own version tag
 and do not update `latest`.
+
+## Upgrading from v0.2.1 or earlier
+
+The default host and container port is now 5321. Download the new Compose file
+when upgrading, set `PORT=5321` in your existing `.env`, and update
+`BETTER_AUTH_URL` if you access the app directly by port. Reverse proxies that
+connect to the container must now use port 5321. For OIDC, update the provider's
+registered redirect URI if the application's public URL changes.
 
 ## Build from source
 

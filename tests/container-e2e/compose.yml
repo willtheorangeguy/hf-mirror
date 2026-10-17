@@ -31,7 +31,7 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: "4321"
+      PORT: "5321"
       DATABASE_URL: file:data/hf-mirror.db
       BETTER_AUTH_SECRET: container-e2e-only-secret-do-not-use-in-production
       ENCRYPTION_SECRET: container-e2e-encryption-only-32chars
@@ -39,13 +39,13 @@ services:
       PUBLIC_BETTER_AUTH_URL: http://localhost:${E2E_APP_PORT:-4328}
       BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:${E2E_APP_PORT:-4328}
       ASTRO_TELEMETRY_DISABLED: "1"
-    ports: ["127.0.0.1:${E2E_APP_PORT:-4328}:4321"]
+    ports: ["127.0.0.1:${E2E_APP_PORT:-4328}:5321"]
     volumes: ["app-data:/app/data"]
     depends_on:
       gitea: { condition: service_healthy }
       source: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4321/api/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5321/api/health"]
       interval: 3s
       timeout: 5s
       retries: 60

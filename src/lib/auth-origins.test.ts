@@ -3,7 +3,7 @@ import { resolveTrustedOrigins, extractSsoProviderOrigins } from "./auth";
 
 // Helper to create a mock Request with specific headers
 function mockRequest(headers: Record<string, string>): Request {
-  return new Request("http://localhost:4321/api/auth/sign-in", {
+  return new Request("http://localhost:5321/api/auth/sign-in", {
     headers: new Headers(headers),
   });
 }
@@ -29,7 +29,7 @@ describe("resolveTrustedOrigins", () => {
 
   test("includes localhost defaults when called without request", async () => {
     const origins = await resolveTrustedOrigins();
-    expect(origins).toContain("http://localhost:4321");
+    expect(origins).toContain("http://localhost:5321");
     expect(origins).toContain("http://localhost:8080");
   });
 
@@ -66,10 +66,10 @@ describe("resolveTrustedOrigins", () => {
 
   test("falls back to host header when x-forwarded-host is absent", async () => {
     const req = mockRequest({
-      host: "myserver.local:4321",
+      host: "myserver.local:5321",
     });
     const origins = await resolveTrustedOrigins(req);
-    expect(origins).toContain("http://myserver.local:4321");
+    expect(origins).toContain("http://myserver.local:5321");
   });
 
   test("handles multi-value x-forwarded-host (chained proxies)", async () => {
@@ -103,9 +103,9 @@ describe("resolveTrustedOrigins", () => {
   });
 
   test("deduplicates origins", async () => {
-    process.env.BETTER_AUTH_URL = "http://localhost:4321";
+    process.env.BETTER_AUTH_URL = "http://localhost:5321";
     const origins = await resolveTrustedOrigins();
-    const count = origins.filter(o => o === "http://localhost:4321").length;
+    const count = origins.filter(o => o === "http://localhost:5321").length;
     expect(count).toBe(1);
   });
 

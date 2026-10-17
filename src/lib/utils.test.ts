@@ -190,12 +190,12 @@ describe("showErrorToast", () => {
       error: (...args: any[]) => calls.push(args),
     };
 
-    showErrorToast("Invalid Origin: http://10.10.20.45:4321", toast);
+    showErrorToast("Invalid Origin: http://10.10.20.45:5321", toast);
 
     expect(calls).toHaveLength(1);
     expect(calls[0][0]).toBe("Invalid Origin");
     expect(calls[0][1].description).toContain("BETTER_AUTH_TRUSTED_ORIGINS");
-    expect(calls[0][1].description).toContain("http://10.10.20.45:4321");
+    expect(calls[0][1].description).toContain("http://10.10.20.45:5321");
   });
 });
 

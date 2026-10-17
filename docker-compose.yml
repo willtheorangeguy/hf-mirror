@@ -4,18 +4,18 @@ services:
     container_name: hf-mirror
     restart: unless-stopped
     ports:
-      - "${PORT:-4321}:4321"
+      - "${PORT:-5321}:5321"
     volumes:
       - ./data:/app/data
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 4321
+      PORT: 5321
       DATABASE_URL: file:data/hf-mirror.db
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4321}
-      PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4321}
-      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_URL:-http://localhost:4321}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:5321}
+      PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:5321}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_URL:-http://localhost:5321}
       HF_USERNAME: ${HF_USERNAME:-}
       HF_TOKEN: ${HF_TOKEN:-}
       SOURCE_URL: ${SOURCE_URL:-https://huggingface.co}

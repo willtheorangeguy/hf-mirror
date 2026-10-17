@@ -38,7 +38,7 @@ export const authClient = createAuthClient({
     }
     
     // Default for SSR - always return a valid URL
-    return 'http://localhost:4321';
+    return 'http://localhost:5321';
   })(),
   basePath: withBase('/api/auth'), // Explicitly set the base path
   plugins: [

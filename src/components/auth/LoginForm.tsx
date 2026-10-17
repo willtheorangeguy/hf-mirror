@@ -91,7 +91,7 @@ export function LoginForm() {
       const callbackURL =
         typeof window !== 'undefined'
           ? new URL(withBase('/'), window.location.origin).toString()
-          : `http://localhost:4321${withBase('/')}`;
+          : `http://localhost:5321${withBase('/')}`;
       const result = await authClient.signIn.sso({
         email: ssoEmail || undefined,
         domain: domain,

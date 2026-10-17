@@ -87,7 +87,7 @@ RUN rm -rf node_modules/esbuild node_modules/@esbuild \
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-ENV PORT=4321
+ENV PORT=5321
 ENV DATABASE_URL=file:data/hf-mirror.db
 ENV BASE_URL=/
 
@@ -105,9 +105,9 @@ RUN mkdir -p /app/certs && \
 USER hf-mirror
 
 VOLUME /app/data
-EXPOSE 4321
+EXPOSE 5321
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD sh -c 'BASE="${BASE_URL:-/}"; if [ "$BASE" = "/" ]; then BASE=""; else BASE="${BASE%/}"; fi; wget --no-verbose --tries=1 --spider "http://localhost:4321${BASE}/api/health" || exit 1'
+  CMD sh -c 'BASE="${BASE_URL:-/}"; if [ "$BASE" = "/" ]; then BASE=""; else BASE="${BASE%/}"; fi; wget --no-verbose --tries=1 --spider "http://localhost:5321${BASE}/api/health" || exit 1'
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

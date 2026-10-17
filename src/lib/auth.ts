@@ -80,7 +80,7 @@ export function extractSsoProviderOrigins(
  */
 export async function resolveTrustedOrigins(request?: Request): Promise<string[]> {
   const origins: string[] = [
-    "http://localhost:4321",
+    "http://localhost:5321",
     "http://localhost:8080", // Keycloak
   ];
 
@@ -196,7 +196,7 @@ export const auth = betterAuth({
   // Base URL configuration - use the primary URL (Better Auth only supports single baseURL)
   baseURL: (() => {
     const url = process.env.BETTER_AUTH_URL;
-    const defaultUrl = "http://localhost:4321";
+    const defaultUrl = "http://localhost:5321";
     
     // Check if URL is provided and not empty
     if (!url || typeof url !== 'string' || url.trim() === '') {

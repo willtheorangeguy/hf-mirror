@@ -38,7 +38,7 @@ function rewriteRequestUrl(rawUrl: string, basePath: string): string | null {
 
 const basePath = normalizeBasePath(process.env.BASE_URL);
 const host = process.env.HOST || "0.0.0.0";
-const port = Number.parseInt(process.env.PORT || "4321", 10);
+const port = Number.parseInt(process.env.PORT || "5321", 10);
 
 process.env.ASTRO_NODE_AUTOSTART = "disabled";
 const { handler } = await import("../dist/server/entry.mjs");
