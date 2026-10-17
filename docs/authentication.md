@@ -1,4 +1,4 @@
-# HF Mirror — Authentication
+# Authentication
 
 HF Mirror uses Better Auth backed by SQLite. Email/password, registered
 OIDC/SAML providers, API keys, and trusted reverse-proxy headers are separate
@@ -100,5 +100,5 @@ headers for a real session and returns cookies used by the React client.
 Compose requires an explicit environment mapping for these optional variables.
 
 For failures, read [troubleshooting](./troubleshooting.md) and inspect
-[auth.ts](../src/lib/auth.ts), [auth-header.ts](../src/lib/auth-header.ts), and
-[oidc-config.ts](../src/lib/sso/oidc-config.ts).
+[auth.ts](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/auth.ts), [auth-header.ts](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/auth-header.ts), and
+[oidc-config.ts](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/sso/oidc-config.ts).

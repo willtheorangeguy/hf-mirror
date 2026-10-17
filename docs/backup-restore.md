@@ -1,4 +1,4 @@
-# HF Mirror — Backup and Restore
+# Backup and restore
 
 There are three distinct artifacts: the forge's mirrored repositories, local
 history snapshots made before updates, and an independent backup of the running

@@ -1,4 +1,4 @@
-# HF Mirror — Notifications
+# Notifications
 
 Configure notifications on Configuration. Notifications start disabled. Choose
 one provider, enter its settings, select events, save, and send a test message.
@@ -57,5 +57,5 @@ cloud metadata destinations and do not follow redirects. Use the final API
 endpoint rather than a redirecting URL. See [deployment](./deployment.md) for
 private CA certificates and [troubleshooting](./troubleshooting.md) for diagnostics.
 
-Implementation: [notification-service.ts](../src/lib/notification-service.ts)
-and the [provider modules](../src/lib/providers/).
+Implementation: [notification-service.ts](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/notification-service.ts)
+and the [provider modules](https://github.com/willtheorangeguy/hf-mirror/tree/HEAD/src/lib/providers/).

@@ -1,12 +1,12 @@
-# HF Mirror — Deployment
+# Deployment
 
 Use the Linux amd64 or arm64 container for a reproducible deployment. Initial
-setup is in [quickstart](./quickstart.md); source and local-image builds are in
+setup is in [quickstart](./getting-started.md); source and local-image builds are in
 [installation](./installation.md).
 
 ## Container lifecycle
 
-The [Compose service](../docker-compose.yml) publishes host `${PORT:-5321}` to
+The [Compose service](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/docker-compose.yml) publishes host `${PORT:-5321}` to
 container port 5321, mounts `./data:/app/data`, and restarts unless stopped.
 The process runs as UID/GID 1001. Prepare only the intended data directory with
 appropriate ownership; existing bind mounts must be writable by that user.
@@ -120,7 +120,7 @@ host and container port is 5321. Update `.env`'s `PORT`, direct-access
 ## Release publishing
 
 Publishing a GitHub release triggers
-[publish-container.yml](../.github/workflows/publish-container.yml). It checks out
+[publish-container.yml](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/.github/workflows/publish-container.yml). It checks out
 the release tag, builds amd64/arm64 images, and publishes
 `ghcr.io/willtheorangeguy/hf-mirror:TAG` using `GITHUB_TOKEN`. It then attaches
 the pinned Compose file, `env.example`, and README to the release. The workflow
@@ -129,4 +129,4 @@ requires content-write and package-write permissions for that job.
 After the first publication, make the GHCR package public to permit anonymous
 pulls. Subsequent releases retain its visibility. A failed workflow can leave a
 release without deployment assets; inspect the job before assuming a download
-or image exists. Keep the [source license and NOTICE](../NOTICE) with distributions.
+or image exists. Keep the [source license and NOTICE](./attribution.md) with distributions.

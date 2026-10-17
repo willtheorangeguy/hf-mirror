@@ -1,4 +1,4 @@
-# HF Mirror — Architecture
+# Architecture
 
 HF Mirror is an Astro server application with React interfaces and a Bun
 runtime. SQLite stores state through Drizzle. It derives from
@@ -6,33 +6,40 @@ runtime. SQLite stores state through Drizzle. It derives from
 authentication, configuration, activity, scheduling, and recovery foundations
 while implementing a Hugging Face source and a push-based backup pipeline.
 
-## Request and transfer flow
+## Overview
+
+The request layer records work in SQLite and delegates content transfers to the
+Git engine. Local archives and destination repositories retain different parts
+of a backup.
 
 ```mermaid
 flowchart TD
-    UI[React interface or API client] --> Routes[Astro API routes and middleware]
-    Routes --> Auth[Better Auth and user guards]
-    Routes --> DB[(SQLite and Drizzle)]
-    Routes --> Discover[HF source provider]
-    Discover --> HF[Hugging Face API]
-    Routes --> Jobs[Mirror dispatch and jobs]
-    Scheduler[Scheduler and recovery] --> Jobs
-    Jobs --> Clone[Persistent bare clone]
-    Clone --> Protect[Snapshot or approval]
-    Protect --> Large[Fetch, hash, upload and verify large files]
-    Large --> Push[Push and verify Git refs]
-    Push --> Meta[Archive metadata and copy conversations]
-    Meta --> Forge[Gitea or Forgejo]
-    Meta --> Archives[Local JSON archives]
-    Jobs --> DB
-    DB --> Events[Activity and event streams]
-    Events --> UI
+    UI[Web interface or API client] -->|sends requests| Routes[Astro routes and auth]
+    Routes -->|stores records| DB[(SQLite)]
+    Routes -->|discovers repositories| HF[HF source provider]
+    Routes -->|starts jobs| Jobs[Mirror dispatch]
+    Scheduler[Scheduler and recovery] -->|resumes work| Jobs
+    Jobs -->|fetches history| Clone[Persistent Git and LFS clone]
+    Clone -->|protects old history| Protect[Snapshot or approval]
+    Protect -->|permits transfer| Transfer[Verify files and push refs]
+    Transfer -->|writes content| Forge[Gitea or Forgejo]
+    Transfer -->|triggers archive| Meta[Metadata and conversations]
+    Meta -->|copies issues| Forge
+    Meta -->|writes JSON| Archive[Local archives]
+    Jobs -->|reports progress| DB
+    DB -->|feeds updates| UI
 ```
+
+## Components
+
+### Request handling
 
 The production runtime wrapper applies `BASE_URL` and delegates to Astro's
 generated handler. Middleware resolves sessions or bridges proxy headers,
 initializes environment configuration, runs recovery, and starts background
 cleanup and scheduling. Process shutdown callbacks stop background services.
+
+### Source provider
 
 Discovery queries models, datasets, Spaces, organizations, likes, and configured
 collections. It stores imported rows without transferring repository contents.
@@ -40,10 +47,12 @@ Source identity includes host, repository type, owner/name, and connection
 association. Connections carry their own encrypted token; the source used by a
 repository is checked before credentials are supplied to Git.
 
-## Backup pipeline
+### Mirror orchestration
 
 The database-aware push wrapper records progress, jobs, destination identity,
-errors, and completion. The lower-level engine performs Git work:
+errors, and completion. The lower-level engine performs Git work.
+
+## Data flow
 
 1. Obtain a per-clone lock and a process-wide transfer slot.
 2. Create or update the persistent bare clone, fetch branches and tags, and map
@@ -80,8 +89,8 @@ own endpoint configuration.
 | `sso_providers`, OAuth/JWK tables | Login provider and authorization-server state |
 | `api_keys`, `rate_limits` | Programmatic access and rate-limit tracking |
 
-The authoritative schemas are [schema.ts](../src/lib/db/schema.ts) and ordered
-[SQL migrations](../drizzle/). Runtime initialization creates the SQLite file and
+The authoritative schemas are [schema.ts](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/lib/db/schema.ts) and ordered
+[SQL migrations](https://github.com/willtheorangeguy/hf-mirror/tree/HEAD/drizzle/). Runtime initialization creates the SQLite file and
 applies pending migrations, with compatibility repair paths for prior schemas.
 Avoid manual schema edits. `DATABASE_URL` controls the app's database location.
 
@@ -91,7 +100,7 @@ repository ID; safety bundles use a hash of source identity. The persistent
 clone also carries LFS files needed by historical safety bundles.
 See [backup and restore](./backup-restore.md).
 
-## Project map
+## Directory layout
 
 ```text
 src/

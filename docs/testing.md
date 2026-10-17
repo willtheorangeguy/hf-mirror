@@ -1,4 +1,4 @@
-# HF Mirror — Testing
+# Testing
 
 Bun is the unit and API route test runner. Production-container E2E tests use
 Docker Compose and Playwright. Use fixtures and disposable destinations for
@@ -13,8 +13,8 @@ bun run test:shared
 bun run test:coverage
 ```
 
-[bunfig.toml](../bunfig.toml) limits discovery to `src/`, preloads
-[setup.bun.ts](../src/tests/setup.bun.ts), and sets a default five-second timeout.
+[bunfig.toml](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/bunfig.toml) limits discovery to `src/`, preloads
+[setup.bun.ts](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/src/tests/setup.bun.ts), and sets a default five-second timeout.
 CI overrides that timeout to 30 seconds and requests coverage. Targeted script
 lists are useful starting points, but do not replace full regression checks.
 
@@ -62,7 +62,7 @@ bun run test:e2e
 The harness builds or uses `hf-mirror:e2e`, deploys the production application,
 a local HF fixture, and Gitea. It exercises model/dataset/Space backups, Git/LFS
 content, metadata, privacy, history rewrites and approval, retries, cancellation,
-and browser behavior. Inspect [run.ts](../tests/container-e2e/run.ts) for the
+and browser behavior. Inspect [run.ts](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/tests/container-e2e/run.ts) for the
 exact retained scenarios.
 
 | Option / variable | Purpose |

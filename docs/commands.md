@@ -1,8 +1,8 @@
-# HF Mirror — Commands
+# Commands
 
 Run Bun scripts from the repository root. Read [installation](./installation.md)
 first; the native SQLite driver requires Bun. These names are taken from
-[package.json](../package.json), not from upstream gitea-mirror docs.
+[package.json](https://github.com/willtheorangeguy/hf-mirror/blob/HEAD/package.json), not from upstream gitea-mirror docs.
 
 ## Setup and server
 
