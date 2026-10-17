@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { GiteaPushTarget } from "./gitea";
+import { createPushTargetFromConfig } from "@/lib/destination-connection";
+import { giteaConfigSchema } from "@/lib/db/schema";
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 const target = new GiteaPushTarget({ url: "https://forge.example", username: "me", token: "target_secret" });
@@ -83,3 +85,27 @@ test("creates a missing organization before its HF repository", async () => {
     "POST /api/v1/orgs", "POST /api/v1/orgs/hf-backups/repos",
   ]);
 });
+
+for (const visibility of ["public", "limited", "private", "default"] as const) {
+  test(`creates organizations with configured ${visibility} visibility`, async () => {
+    let organizationCreated = false;
+    const configuredTarget = createPushTargetFromConfig({
+      giteaConfig: giteaConfigSchema.parse({ url: "https://forge.example", defaultOwner: "me", token: "target_secret", visibility }),
+    });
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const route = new URL(String(url)).pathname;
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        if (route === "/api/v1/orgs") {
+          expect(body).toEqual({ username: "hf-backups", ...(visibility === "default" ? {} : { visibility }) });
+          organizationCreated = true;
+          return Response.json(body);
+        }
+        return Response.json({ ...body, owner: { login: "hf-backups" } });
+      }
+      return Response.json({}, { status: 404 });
+    }) as typeof fetch;
+    await configuredTarget.ensureRepository({ owner: "hf-backups", name: "model", isPrivate: true, description: marker });
+    expect(organizationCreated).toBe(true);
+  });
+}

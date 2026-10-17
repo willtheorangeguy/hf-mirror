@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { db } from "./db";
 import { giteaConfigSchema, repositorySchema, sourceConfigSchema } from "./db/schema";
-import { getGiteaRepoOwner, getGiteaRepoOwnerAsync } from "./destination-api";
+import { getGiteaRepoOwner, getGiteaRepoOwnerAsync, getOrCreateGiteaOrg } from "./destination-api";
 import { mapDbToUiConfig, mapUiToDbConfig } from "./utils/config-mapper";
 
 const config = {
@@ -75,4 +75,25 @@ describe("source organization override", () => {
   test("an organization without an override inherits the HF default", async () => {
     expect(await getGiteaRepoOwnerAsync({ config, repository: { ...repository, organization: "source-org" } })).toBe("hf-backups");
   });
+});
+
+describe("destination organization visibility", () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = originalFetch; });
+
+  for (const visibility of ["public", "limited", "private", "default"] as const) {
+    test(`organization creation uses configured ${visibility} visibility`, async () => {
+      let created = false;
+      globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          expect(JSON.parse(String(init.body))).toEqual({ username: "hf-backups", ...(visibility === "default" ? {} : { visibility }) });
+          created = true;
+          return Response.json({ id: 42 });
+        }
+        return Response.json({}, { status: 404 });
+      }) as typeof fetch;
+      expect(await getOrCreateGiteaOrg({ config: { ...config, giteaConfig: { ...config.giteaConfig, visibility } }, orgName: "hf-backups" })).toBe(42);
+      expect(created).toBe(true);
+    });
+  }
 });

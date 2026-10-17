@@ -12,7 +12,11 @@ interface GiteaRepo {
 export class GiteaPushTarget implements PushTarget {
   readonly kind = "gitea" as const;
   readonly baseUrl: string;
-  constructor(private readonly connection: PushTargetConnection, private readonly createOrg = true) {
+  constructor(
+    private readonly connection: PushTargetConnection,
+    private readonly createOrg = true,
+    private readonly orgVisibility: "public" | "limited" | "private" | "default" = "private"
+  ) {
     this.baseUrl = connection.url.replace(/\/+$/, "");
   }
   async api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
@@ -55,7 +59,7 @@ export class GiteaPushTarget implements PushTarget {
       try { await this.api(`/orgs/${encodeURIComponent(input.owner)}`); }
       catch (error) {
         if (!isTargetNotFound(error)) throw error;
-        try { await this.api("/orgs", "POST", { username: input.owner, visibility: "private" }); }
+        try { await this.api("/orgs", "POST", { username: input.owner, visibility: this.orgVisibility === "default" ? undefined : this.orgVisibility }); }
         catch (creationError) {
           // A concurrent repository may have created the organization.
           try { await this.api(`/orgs/${encodeURIComponent(input.owner)}`); }

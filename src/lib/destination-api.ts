@@ -92,8 +92,9 @@ export async function getOrCreateGiteaOrg({ config, orgName }: { config: Partial
   try { return (await httpGet<{ id: number }>(`${url}/orgs/${encodeURIComponent(orgName)}`, auth)).data.id; }
   catch (error) { if (!(error instanceof HttpError) || error.status !== 404) throw error; }
   if (config.giteaConfig?.createOrg === false) throw new Error(`Destination organization ${orgName} does not exist`);
+  const visibility = config.giteaConfig?.visibility ?? "private";
   try {
-    return (await httpPost<{ id: number }>(`${url}/orgs`, { username: orgName, visibility: "private" }, auth)).data.id;
+    return (await httpPost<{ id: number }>(`${url}/orgs`, { username: orgName, visibility: visibility === "default" ? undefined : visibility }, auth)).data.id;
   } catch (error) {
     try { return (await httpGet<{ id: number }>(`${url}/orgs/${encodeURIComponent(orgName)}`, auth)).data.id; }
     catch { throw error; }

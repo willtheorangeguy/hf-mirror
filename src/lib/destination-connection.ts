@@ -73,7 +73,7 @@ export function createPushTargetFromConfig(config: Partial<Config>): PushTarget 
   if (kind !== "gitea" && kind !== "forgejo") throw new Error("HF-mirror requires a Gitea or Forgejo destination");
   const connection = resolveDestinationConnection(config);
   if (!connection.token) throw new Error("A Gitea or Forgejo token is required to push mirrors.");
-  return new GiteaPushTarget(connection, config.giteaConfig?.createOrg !== false);
+  return new GiteaPushTarget(connection, config.giteaConfig?.createOrg !== false, config.giteaConfig?.visibility);
 }
 
 /**
