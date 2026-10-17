@@ -13,7 +13,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, cpSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -57,6 +57,34 @@ describe.skipIf(!isChild)("manage-db reset-password", () => {
   });
 
   for (const bundled of [false, true]) {
+    for (const scheme of ["file:", "sqlite://", ""]) {
+      test(`${bundled ? "bundled" : "source"} script honors ${scheme || "plain"} DATABASE_URL`, async () => {
+        const { Database } = await import("bun:sqlite");
+        const { verifyPassword } = await import("better-auth/crypto");
+        const cwd = mkdtempSync(join(temporaryRoot, "custom-path-"));
+        cpSync(join(root, "drizzle"), join(cwd, "drizzle"), { recursive: true });
+        const customPath = join(cwd, "custom", "database.db");
+        const script = bundled ? bundle : join(root, "scripts/manage-db.ts");
+        const env = { ...process.env, DATABASE_URL: `${scheme}custom/database.db` };
+        const command = (...args: string[]) => {
+          const result = Bun.spawnSync({ cmd: [process.execPath, script, ...args], cwd, env, stdout: "pipe", stderr: "pipe" });
+          expect(result.exitCode, result.stderr.toString()).toBe(0);
+        };
+        command("init");
+        expect(existsSync(customPath)).toBe(true);
+        expect(existsSync(join(cwd, "data", "hf-mirror.db"))).toBe(false);
+        const db = new Database(customPath);
+        try {
+          db.exec("INSERT INTO users (id, name, email) VALUES ('custom', 'Custom', 'custom@example.com')");
+          command("check");
+          command("reset-password", "--email=custom@example.com", "--new-password=custom-secure-password");
+          const credential = db.query("SELECT password FROM accounts WHERE user_id = 'custom'").get() as { password: string };
+          expect(await verifyPassword({ hash: credential.password, password: "custom-secure-password" })).toBe(true);
+        } finally {
+          db.close();
+        }
+      }, 15_000);
+    }
     for (const existingCredential of [false, true]) {
       test(`${bundled ? "bundled" : "source"} script, ${existingCredential ? "existing" : "new"} credential`, async () => {
         const { Database } = await import("bun:sqlite");
