@@ -29,6 +29,8 @@ export const DELETE: APIRoute = async (context) => {
         name: repositories.name,
         sourceProvider: repositories.sourceProvider,
         sourceUrl: repositories.sourceUrl,
+        sourceId: repositories.sourceId,
+        repoType: repositories.repoType,
         destinationProvider: repositories.destinationProvider,
       })
       .from(repositories)
