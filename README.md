@@ -1,81 +1,104 @@
-# HF Mirror
+<!-- Logo -->
+<h1 align="center">HF Mirror</h1>
 
-Mirror Hugging Face repositories to Gitea with a web interface.
+<!-- Tagline -->
+<h4 align="center">Back up Hugging Face models, datasets, and Spaces to Gitea or Forgejo through a web interface.</h4>
 
-## Deploy with Docker Compose
+<!-- Badges -->
+<p align="center">
+  <a href="https://github.com/willtheorangeguy/hf-mirror/issues"><img alt="Issues" src="https://img.shields.io/github/issues/willtheorangeguy/hf-mirror"></a>
+  <a href="https://github.com/willtheorangeguy/hf-mirror/pulls"><img alt="Pull requests" src="https://img.shields.io/github/issues-pr/willtheorangeguy/hf-mirror"></a>
+  <a href="LICENSE"><img alt="License: AGPLv3" src="https://img.shields.io/badge/license-AGPLv3-blue"></a>
+  <a href="https://github.com/willtheorangeguy/hf-mirror/actions/workflows/astro-build-test.yml"><img alt="Build and regression tests" src="https://github.com/willtheorangeguy/hf-mirror/actions/workflows/astro-build-test.yml/badge.svg"></a>
+  <a href="https://github.com/willtheorangeguy/hf-mirror/actions/workflows/e2e-tests.yml"><img alt="Container E2E" src="https://github.com/willtheorangeguy/hf-mirror/actions/workflows/e2e-tests.yml/badge.svg"></a>
+  <a href="https://github.com/willtheorangeguy/hf-mirror/actions/workflows/publish-container.yml"><img alt="Publish container" src="https://github.com/willtheorangeguy/hf-mirror/actions/workflows/publish-container.yml/badge.svg"></a>
+  <a href="https://github.com/willtheorangeguy/hf-mirror/releases"><img alt="Release" src="https://img.shields.io/github/v/release/willtheorangeguy/hf-mirror"></a>
+</p>
+
+<!-- Nav -->
+<p align="center">
+  <a href="#key-features">Key Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#documentation">Documentation</a> •
+  <a href="#support">Support</a> •
+  <a href="#contributing">Contributing</a> •
+  <a href="#license">License</a> •
+  <a href="#attribution">Attribution</a>
+</p>
+
+HF Mirror keeps local Git clones, transfers historical large files, and pushes
+verified backups to your own forge. It is based on
+[RayLabsHQ's gitea-mirror](https://github.com/RayLabsHQ/gitea-mirror), adapted for
+Hugging Face repositories. Gitea is the default destination; Forgejo is beta.
+
+## Key Features
+
+- Discover models, datasets, and Spaces from accounts, organizations, likes, and collections.
+- Transfer branches, tags, HF pull request refs, and historical LFS/Xet-backed files.
+- Verify local large-file hashes, destination LFS availability, and Git refs.
+- Archive metadata and discussions; represent HF pull requests as destination issues.
+- Protect destination history with safety snapshots or approval before destructive updates.
+- Schedule discovery and mirroring, track live progress, retry failures, and cancel transfers.
+- Sign in with email/password, OIDC/SAML SSO, or trusted proxy headers; automate with API keys.
+- Deploy Linux amd64/arm64 containers with persistent SQLite, clones, and metadata archives.
+
+## Installation
 
 Download `docker-compose.yml` and `env.example` from the
-[latest release](https://github.com/willtheorangeguy/hf-mirror/releases/latest)
-into a directory on your server. Release downloads become available after the
-container publishing workflow succeeds. Images support Linux amd64 and arm64.
+[latest release](https://github.com/willtheorangeguy/hf-mirror/releases/latest).
+On a Linux Docker host with Compose and OpenSSL:
 
 ```sh
 cp env.example .env
 mkdir -p data
-sudo chown -R 1001:1001 data
+sudo chown 1001:1001 data
 openssl rand -hex 32
 ```
 
-Edit `.env`: set `BETTER_AUTH_SECRET` to the generated value and
-`BETTER_AUTH_URL` to the address you will use to access the app, such as
-`https://mirror.example.com` or `http://192.168.1.10:5321`.
-Set `PORT` if you want a host port other than 5321. Configure Hugging Face
-and Gitea credentials in `.env` or through the web interface.
+Set `BETTER_AUTH_SECRET` in `.env` to the generated value and set
+`BETTER_AUTH_URL` to your public address, such as `http://localhost:5321`.
 
 ```sh
 docker compose pull
 docker compose up -d
-docker compose logs -f
 ```
 
-Open the configured address and create your account. The `data` directory holds
-the database, mirror data, and generated encryption secret; preserve it across
-upgrades and include it in backups. The container runs as UID/GID 1001, so this
-directory must be writable by that user.
+The container runs as UID/GID 1001. Preserve `data/`, including its hidden
+encryption secret. See [installation](docs/installation.md) for source builds.
 
-Release downloads pin `HF_MIRROR_VERSION` to that release. To upgrade, set it
-to the desired release tag in `.env`, then run `docker compose pull` and
-`docker compose up -d` again. The Compose file in the repository defaults to
-`latest`, which tracks stable releases. Prereleases have their own version tag
-and do not update `latest`.
+## Usage
 
-## Upgrading from v0.2.1 or earlier
+Open your configured address, create the first account, and configure a Hugging
+Face source plus your Gitea destination. Test both connections, add a small
+repository by URL, and select **Mirror**. A successful transfer reaches
+`mirrored`; check its large-file status before treating it as a complete backup.
+See the [quickstart](docs/quickstart.md) for a full first-run walkthrough.
 
-The default host and container port is now 5321. Download the new Compose file
-when upgrading, set `PORT=5321` in your existing `.env`, and update
-`BETTER_AUTH_URL` if you access the app directly by port. Reverse proxies that
-connect to the container must now use port 5321. For OIDC, update the provider's
-registered redirect URI if the application's public URL changes.
+## Documentation
 
-## Build from source
+Full documentation lives in [`docs/`](docs/README.md):
+[Installation](docs/installation.md) · [Usage](docs/usage.md) · [Configuration](docs/configuration.md) · [Troubleshooting](docs/troubleshooting.md)
 
-```sh
-bun run setup
-bun run dev
-```
+Operations: [Deployment](docs/deployment.md) · [Backup and restore](docs/backup-restore.md) · [Authentication](docs/authentication.md) · [API](docs/api.md).
 
-To use a local container build with Compose, create `compose.local.yml`:
+## Support
 
-```yaml
-services:
-  hf-mirror:
-    image: hf-mirror:local
-    build: .
-```
+Open a [GitHub Discussion](https://github.com/willtheorangeguy/hf-mirror/discussions/new) or file an [issue](https://github.com/willtheorangeguy/hf-mirror/issues/new/choose).
 
-```sh
-docker compose -f docker-compose.yml -f compose.local.yml up -d --build
-```
+## Contributing
 
-## Release publishing
+Contributions welcome. See the org-wide [Contributing Guide](https://github.com/willtheorangeguy/.github/blob/main/CONTRIBUTING.md) and [Code of Conduct](https://github.com/willtheorangeguy/.github/blob/main/CODE_OF_CONDUCT.md).
+Read the [development guide](docs/development.md) for local setup and validation.
 
-Publishing a GitHub release triggers the
-[container workflow](.github/workflows/publish-container.yml). It builds the
-Dockerfile and publishes `ghcr.io/willtheorangeguy/hf-mirror:<release-tag>`
-using the repository's `GITHUB_TOKEN`, then attaches deployment files to the
-release. This follows GitHub's
-[container publishing workflow](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images).
+## License
 
-For the first publication, the GHCR package must be made public in its package
-settings to allow servers to pull without authentication. Subsequent releases
-retain that visibility.
+GNU AGPL version 3 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+The existing upstream license and attribution are retained.
+
+## Attribution
+
+This codebase is based on **[gitea-mirror by RayLabsHQ](https://github.com/RayLabsHQ/gitea-mirror)**,
+distributed under GNU AGPLv3. HF Mirror builds on its application foundation
+with Hugging Face discovery, verified large-file transfers, and metadata archives.
+Upstream instructions describe a different feature set; use this repository's docs for HF Mirror.
