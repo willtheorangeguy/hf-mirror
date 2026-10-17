@@ -81,7 +81,8 @@ interface LFSObject { oid: string; size: number }
 export async function lfsObjects(plan: PushMirrorPlan): Promise<LFSObject[]> {
   const { stdout } = await runGit(["-C", plan.clonePath, "lfs", "ls-files", "--all", "--json"]);
   const parsed = JSON.parse(stdout || "[]");
-  const entries: LFSObject[] = Array.isArray(parsed) ? parsed : parsed.files;
+  // Git LFS encodes its uninitialized file slice as null when no pointers exist.
+  const entries: LFSObject[] = Array.isArray(parsed) ? parsed : parsed?.files === null ? [] : parsed?.files;
   if (!Array.isArray(entries)) throw new Error("Unexpected Git LFS inventory format");
   const unique = new Map<string, LFSObject>();
   for (const entry of entries) {

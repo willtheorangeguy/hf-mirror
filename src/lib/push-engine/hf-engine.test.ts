@@ -60,6 +60,10 @@ test("history rewrite waits for approval and approval creates a safety snapshot"
   expect((await remoteRefs(destination, null)).get("refs/heads/main")).not.toBe(before.get("refs/heads/main"));
 }, 30_000);
 
+test("inventories a repository without LFS pointers as an empty list", async () => {
+  expect(await lfsObjects({ ...plan, clonePath: path.join(source, ".git") })).toEqual([]);
+}, 30_000);
+
 test("inventories historical LFS pointers and rejects corrupt local objects", async () => {
   const content = Buffer.from("historical model weights");
   const oid = new Bun.CryptoHasher("sha256").update(content).digest("hex");

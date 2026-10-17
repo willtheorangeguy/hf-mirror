@@ -1,7 +1,7 @@
 {
   "name": "hf-mirror",
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "engines": {
     "bun": ">=1.2.9"
   },
