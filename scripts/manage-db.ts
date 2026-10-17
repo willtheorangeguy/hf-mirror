@@ -7,19 +7,18 @@ import { v4 as uuidv4 } from "uuid";
 import { users, configs, repositories, organizations, mirrorJobs, events, accounts, sessions } from "../src/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
+import { resolveDbPath } from "../src/lib/db/path";
 
 // Command line arguments
 const args = process.argv.slice(2);
 const command = args[0] || "check";
 
 // Ensure data directory exists
-const dataDir = path.join(process.cwd(), "data");
+const dbPath = resolveDbPath();
+const dataDir = path.dirname(dbPath);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
-
-// Database path - ensure we use absolute path
-const dbPath = path.join(dataDir, "hf-mirror.db");
 
 /**
  * Initialize database with migrations

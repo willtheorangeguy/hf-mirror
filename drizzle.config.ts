@@ -1,11 +1,12 @@
 import { defineConfig } from "drizzle-kit";
+import { resolveDbPath } from "./src/lib/db/path";
 
 export default defineConfig({
   dialect: "sqlite",
   schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: "./data/hf-mirror.db",
+    url: resolveDbPath(),
   },
   verbose: true,
   strict: true,
