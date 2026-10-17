@@ -138,10 +138,9 @@ async function executePushMirrorRepository({
   const effectiveMode: PushMirrorMode = mode ?? (recorded ? "sync" : "mirror");
   const owner = recorded?.owner ?? (await getGiteaRepoOwnerAsync({ config, repository, sourceUsername: findSourceForRepository(repository, sources)?.username }));
   const hf = repository.sourceProvider === "huggingface";
-  const rawName = recorded?.name ?? (hf ? `${repository.repoType}--${repository.owner}--${repository.name}` : repository.name);
+  const name = recorded?.name ?? repository.name;
   const options = await resolveMirrorOptionsForRepository({ config, repository });
   const identity = `${repository.sourceUrl}|${repository.repoType}|${repository.fullName}`;
-  const name = recorded?.name ?? (rawName.length <= 100 ? rawName : `${rawName.slice(0, 78)}--${createHash("sha256").update(identity).digest("hex").slice(0, 16)}`);
   const archiveDirectory = path.join(resolveDataDir(), "archives", repository.id);
   const marker = `[HF-mirror:${createHash("sha256").update(identity).digest("hex")}]`;
   const location = `${owner}/${name}`;

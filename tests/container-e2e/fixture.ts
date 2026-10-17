@@ -19,7 +19,8 @@ async function git(args: string[]) {
   return out.trim();
 }
 for (const prefix of ["", "datasets/", "spaces/"]) {
-  const work = `${root}/${prefix}alice/tiny`;
+  const name = prefix ? `tiny-${prefix.slice(0, -1)}` : "tiny";
+  const work = `${root}/${prefix}alice/${name}`;
   await mkdir(work, { recursive: true });
   await git(["init", "-b", "main", work]);
   await git(["-C", work, "config", "user.name", "HF fixture"]);
@@ -46,7 +47,7 @@ for (const prefix of ["", "datasets/", "spaces/"]) {
 }
 const work = `${root}/alice/tiny`;
 const state = async () => ({ revision, oid, size: weights.length, prOid, prSize: prWeights.length, sha: await git(["-C", work, "rev-parse", "HEAD"]), denied });
-const metadata = (type: string) => ({ id: "alice/tiny", private: type === "spaces", gated: type === "datasets" ? "auto" : false,
+const metadata = (type: string) => ({ id: `alice/${type === "models" ? "tiny" : `tiny-${type}`}`, private: type === "spaces", gated: type === "datasets" ? "auto" : false,
   tags: ["pytorch", "test-model"], description: "Container E2E fixture", createdAt: "2025-01-01T00:00:00Z", lastModified: new Date().toISOString(), siblings: [{ rfilename: "weights.bin", lfs: { oid, size: weights.length } }] });
 const server = Bun.serve({ hostname: "0.0.0.0", port: 8080, async fetch(request) {
   try {
@@ -85,7 +86,7 @@ const server = Bun.serve({ hostname: "0.0.0.0", port: 8080, async fetch(request)
     }
     if (offline) { denied++; return new Response("Source offline", { status: 503 }); }
     if (url.pathname === "/api/whoami-v2") return Response.json({ name: "alice", orgs: [] });
-    const api = url.pathname.match(/^\/api\/(models|datasets|spaces)\/alice\/tiny(.*)$/);
+    const api = url.pathname.match(/^\/api\/(models|datasets|spaces)\/alice\/tiny(?:-datasets|-spaces)?(.*)$/);
     if (api) {
       const discussion = (num: number) => ({ num, title: `Conversation ${num} revision ${revision}`, status: revision > 1 ? "closed" : "open", isPullRequest: num === 7,
         author: { name: "alice" }, createdAt: "2025-01-01T00:00:00Z", events: [{ id: `comment-${num}`, type: "comment", author: { name: "alice" }, createdAt: "2025-01-01T00:00:00Z", data: { latest: { raw: `Comment revision ${revision}` } } }] });

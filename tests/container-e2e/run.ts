@@ -80,7 +80,8 @@ async function mirror(repo: any, mode = "mirror", expected = "", approve = false
   }
   throw new Error(`Mirror timeout: ${JSON.stringify(latest)}`);
 }
-const repoRoute = (type = "model") => `/repos/e2e_admin/${type}--alice--tiny`;
+const repoName = (type = "model") => type === "model" ? "tiny" : `tiny-${type}s`;
+const repoRoute = (type = "model") => `/repos/e2e_admin/${repoName(type)}`;
 let model: any;
 try {
   if (!process.argv.includes("--skip-build")) await step("Build production Docker image", async () => {
@@ -103,13 +104,14 @@ try {
       advancedOptions: { skipForks: false, starredCodeOnly: false },
     });
   });
-  await step("Import and mirror same-name model, gated dataset and private Space", async () => {
+  await step("Import and mirror model, gated dataset and private Space using their source names", async () => {
     for (const type of ["model", "dataset", "space"]) {
-      const data = await api(app, "/api/sync/repository", { owner: "alice", repo: "tiny", repoType: type });
+      const data = await api(app, "/api/sync/repository", { owner: "alice", repo: repoName(type), repoType: type });
       assert.equal(data.success, true); const repo = data.repository;
       if (type === "model") model = repo;
       await mirror(repo);
       const destination = await target(repoRoute(type));
+      assert.equal(destination.name, repoName(type));
       assert.equal(destination.private, type !== "model", `${type} privacy`);
       assert.equal(destination.default_branch, "main");
       assert.equal(destination.mirror, false);
@@ -167,7 +169,7 @@ try {
   await step("Restore historical LFS weights from Gitea with HF source offline", async () => {
     const expected = await api(source, "/__test/state");
     await api(source, "/__test/offline", {});
-    const restored = await api(source, "/__test/restore", { cloneUrl: "http://gitea:3000/e2e_admin/model--alice--tiny.git", token });
+    const restored = await api(source, "/__test/restore", { cloneUrl: "http://gitea:3000/e2e_admin/tiny.git", token });
     assert.equal(restored.oid, expected.oid); assert.equal(restored.size, expected.size); assert.equal(restored.denied, 0);
     assert.equal(restored.prOid, expected.prOid);
   });
@@ -200,7 +202,7 @@ try {
       assert.equal(archive.transfer.largeFiles, "complete");
       assert(archive.transfer.objects.length > 0, "Live model must contain large file objects");
       const object = archive.transfer.objects[0];
-      const restored = await api(source, "/__test/restore", { cloneUrl: "http://gitea:3000/e2e_admin/model--hf-internal-testing--tiny-random-BertModel.git", token, expectedOid: object.oid });
+      const restored = await api(source, "/__test/restore", { cloneUrl: "http://gitea:3000/e2e_admin/tiny-random-BertModel.git", token, expectedOid: object.oid });
       assert.equal(restored.oid, object.oid); assert.equal(restored.size, object.size);
     });
   }
