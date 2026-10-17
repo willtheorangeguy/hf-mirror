@@ -92,7 +92,7 @@ describe("destination organization visibility", () => {
         }
         return Response.json({}, { status: 404 });
       }) as typeof fetch;
-      expect(await getOrCreateGiteaOrg({ config: { ...config, giteaConfig: { ...config.giteaConfig, visibility } }, orgName: "hf-backups" })).toBe(42);
+      expect(await getOrCreateGiteaOrg({ config: { ...config, giteaConfig: { ...config.giteaConfig, token: "target_secret", visibility } }, orgName: "hf-backups" })).toBe(42);
       expect(created).toBe(true);
     });
   }
