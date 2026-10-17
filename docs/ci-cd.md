@@ -43,8 +43,9 @@ external link checks. The deploy workflow grants `contents: read`, `pages: write
 and `id-token: write`, then publishes the built static site to GitHub Pages.
 The `pages` concurrency group keeps deployments from cancelling one another.
 
-The site URL is [HF Mirror documentation](https://williamvdg.me/hf-mirror/).
-It hosts documentation, not the Bun server application. No application root
+The site publishes at `https://williamvdg.me/hf-mirror/` after this workflow
+reaches the default branch. It hosts documentation, not the Bun server
+application. No application root
 site needs to be copied into its Pages artifact.
 
 The workflows track the shared repository's `main` branch. Shared theme or

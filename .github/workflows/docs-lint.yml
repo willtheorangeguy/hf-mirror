@@ -15,6 +15,7 @@ on:
       - '.github/workflows/docs.yml'
       - 'LICENSE'
       - 'NOTICE'
+      - '.env.example'
   workflow_dispatch:
 
 permissions:

@@ -22,6 +22,7 @@ on:
       - 'LICENSE.md'
       - 'LICENSE'
       - 'NOTICE'
+      - '.env.example'
   workflow_dispatch:
 
 # A reusable workflow cannot grant its own permissions. These three are

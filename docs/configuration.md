@@ -29,7 +29,7 @@ The environment loader runs when connection variables are present: any of
 It targets the first-created account and updates its active configuration and
 primary source after an account exists. Additional connections are managed
 through the UI/API. `bun run startup-env-config` runs the same initialization
-manually and can write configuration; it is not just a validation command.
+manually and writes configuration.
 
 Environment configuration is reapplied on startup. Several booleans have explicit
 defaults even when unset, so an environment-managed installation can replace UI
